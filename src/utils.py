@@ -13,7 +13,7 @@ def get_claude_client():
         raise ValueError("ANTHROPIC_API_KEY not found in .env file")
     return anthropic.Anthropic(api_key=api_key)
 
-def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-20250514"):
+def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-20250514", temperature=0):
     """
     Make Claude API call and track costs
     

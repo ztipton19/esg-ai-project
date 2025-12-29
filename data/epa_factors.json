@@ -1,0 +1,13 @@
+{
+  "electricity": {
+    "US_AVERAGE": 0.855,
+    "ARKANSAS": 0.732,
+    "CALIFORNIA": 0.441,
+    "TEXAS": 0.898,
+    "unit": "kg_co2_per_kwh"
+  },
+  "natural_gas": {
+    "US_AVERAGE": 5.3,
+    "unit": "kg_co2_per_therm"
+  }
+}

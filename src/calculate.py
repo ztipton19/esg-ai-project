@@ -55,7 +55,7 @@ Return ONLY valid JSON, no markdown formatting."""
     # Parse JSON
     try:
         data = json.loads(response)
-        data['api_cost'] = cost['total_cost']
+        data['categorization_cost'] = cost['total_cost']
         
         # Validate scope value
         valid_scopes = ["Scope 1", "Scope 2", "Scope 3", "Unknown"]
@@ -71,7 +71,7 @@ Return ONLY valid JSON, no markdown formatting."""
         return {
             "scope": "Unknown",
             "reasoning": "Failed to parse response",
-            "api_cost": cost['total_cost']
+            "categorization_cost": cost['total_cost']
         }
 
 # Test it
@@ -90,4 +90,4 @@ if __name__ == "__main__":
         print(f"\nActivity: '{activity}'")
         print(f"Scope: {result['scope']}")
         print(f"Reasoning: {result['reasoning']}")
-        print(f"API Cost: ${result['api_cost']:.6f}")
+        print(f"Cost: ${result['categorization_cost']:.6f}")

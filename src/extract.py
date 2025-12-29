@@ -50,7 +50,7 @@ Return ONLY raw JSON, no other text.
     # Parse JSON response
     try:
         data = json.loads(response)
-        data['api_cost'] = cost['total_cost']
+        data['extraction_cost'] = cost['total_cost']
         
         # Log missing fields
         missing = [k for k, v in data.items() if v is None and k != 'extraction_cost']

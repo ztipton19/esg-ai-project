@@ -30,9 +30,22 @@ IMPORTANT INSTRUCTIONS:
 Utility Bill:
 {bill_text}
 
-Return ONLY valid JSON, no other text."""
+Return ONLY raw JSON, no other text.
+- Do not wrap in markdown code blocks.
+- Do not include the word "json" before the response.
+- Start directly with the opening brace."""
 
     response, cost = call_claude_with_cost(prompt, max_tokens=512)
+
+    # Strip markdown code fences if present
+    response = response.strip()
+    if response.startswith("```json"):
+        response = response[7:]  # Remove ```json
+    if response.startswith("```"):
+        response = response[3:]   # Remove ```
+    if response.endswith("```"):
+        response = response[:-3]  # Remove trailing ```
+    response = response.strip()
     
     # Parse JSON response
     try:
@@ -48,3 +61,12 @@ Return ONLY valid JSON, no other text."""
     except json.JSONDecodeError:
         print(f"Failed to parse JSON: {response}")
         return None
+
+if __name__ == "__main__":
+    try:
+        with open("data/test_bills/sample_electric_bill.txt", "r") as f:
+            bill_text = f.read()
+        result = extract_utility_bill_data(bill_text)
+        print(json.dumps(result, indent=2))
+    except FileNotFoundError:
+        print("Error: File not found.")

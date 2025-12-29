@@ -1,0 +1,13 @@
+ELECTRIC COMPANY
+Account #: 123456789
+Service Period: December 1 - December 31, 2024
+
+Usage Summary:
+Total kWh: 850
+Peak: 320 kWh
+Off-Peak: 530 kWh
+
+Charges:
+Energy Charge: $102.00
+Delivery Charge: $25.50
+Total Amount Due: $127.50

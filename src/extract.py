@@ -35,7 +35,7 @@ Return ONLY raw JSON, no other text.
 - Do not include the word "json" before the response.
 - Start directly with the opening brace."""
 
-    response, cost = call_claude_with_cost(prompt, max_tokens=512)
+    response, cost = call_claude_with_cost(prompt, max_tokens=512, temperature=0)
 
     # Strip markdown code fences if present
     response = response.strip()

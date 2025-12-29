@@ -1,1 +1,57 @@
-# Cost tracking, helpers
+"""Utility functions for ESG automation system"""
+import os
+from dotenv import load_dotenv
+import anthropic
+
+# Load environment variables
+load_dotenv()
+
+def get_claude_client():
+    """Initialize and return Claude API client"""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not found in .env file")
+    return anthropic.Anthropic(api_key=api_key)
+
+def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-20250514"):
+    """
+    Make Claude API call and track costs
+    
+    Args:
+        prompt: Text prompt for Claude
+        max_tokens: Maximum tokens in response
+        model: Claude model to use
+        
+    Returns:
+        tuple: (response_text, cost_info_dict)
+    """
+    client = get_claude_client()
+    
+    response = client.messages.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    
+    # Extract usage info
+    input_tokens = response.usage.input_tokens
+    output_tokens = response.usage.output_tokens
+    
+    # Calculate costs (Claude Sonnet 4 pricing)
+    input_cost = (input_tokens / 1_000_000) * 3.00
+    output_cost = (output_tokens / 1_000_000) * 15.00
+    total_cost = input_cost + output_cost
+    
+    cost_info = {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_cost": total_cost
+    }
+    
+    return response.content[0].text, cost_info
+
+# Test it
+if __name__ == "__main__":
+    response, cost = call_claude_with_cost("What is ESG reporting?")
+    print(f"Response: {response}")
+    print(f"Cost: ${cost['total_cost']:.4f}")

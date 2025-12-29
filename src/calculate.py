@@ -90,4 +90,4 @@ if __name__ == "__main__":
         print(f"\nActivity: '{activity}'")
         print(f"Scope: {result['scope']}")
         print(f"Reasoning: {result['reasoning']}")
-        print(f"Cost: ${result['categorization_cost']:.6f}")
+        print(f"API Cost: ${result['categorization_cost']:.6f}")

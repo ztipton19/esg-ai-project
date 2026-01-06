@@ -1,3 +1,6 @@
+# PDF files
+data/esg_standards/**/*.pdf
+
 # Personal notes
 notes/
 

@@ -112,6 +112,7 @@ class ESGStandardsRAG:
 
 # Test it
 if __name__ == "__main__":
+    print("--- Script Starting ---", flush=True)
     rag = ESGStandardsRAG()
     
     test_questions = [

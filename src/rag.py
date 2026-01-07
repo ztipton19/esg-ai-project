@@ -34,25 +34,43 @@ class ESGStandardsRAG:
         return documents
     
     def create_vectorstore(self):
-        """Create vector database from documents"""
-        documents = self.load_documents()
+        """
+        Creates a vector database if one doesn't exist; 
+        otherwise, loads the existing one from disk.
+        """
+        persist_directory = "data/chroma_db"
         
-        # Split into chunks
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
+        # 1. Setup Embeddings (Always needed to either read or write to the DB)
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_kwargs={'device': 'cpu'}
         )
-        splits = text_splitter.split_documents(documents)
-        
-        # Create embeddings and vectorstore
-        embeddings = HuggingFaceEmbeddings()
-        self.vectorstore = Chroma.from_documents(
-            documents=splits,
-            embedding=embeddings,
-            persist_directory="data/chroma_db"
-        )
-        
-        print(f"Created vectorstore with {len(splits)} chunks")
+
+        # 2. Check if the database folder already exists
+        if os.path.exists(persist_directory) and os.listdir(persist_directory):
+            print(f"--- Found existing database at {persist_directory}. Loading... ---")
+            self.vectorstore = Chroma(
+                persist_directory=persist_directory, 
+                embedding_function=embeddings
+            )
+        else:
+            print(f"--- No database found. Creating new one at {persist_directory}... ---")
+            
+            # Load and split documents only if we actually need to create the DB
+            documents = self.load_documents()
+            
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200
+            )
+            splits = text_splitter.split_documents(documents)
+            
+            self.vectorstore = Chroma.from_documents(
+                documents=splits,
+                embedding=embeddings,
+                persist_directory=persist_directory
+            )
+            print(f"--- Database created with {len(splits)} chunks. ---")
         
     def query(self, question):
         """Query the ESG standards and get answer"""

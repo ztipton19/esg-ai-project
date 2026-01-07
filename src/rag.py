@@ -73,33 +73,35 @@ class ESGStandardsRAG:
             print(f"--- Database created with {len(splits)} chunks. ---")
         
     def query(self, question):
-        """Query the ESG standards and get answer"""
-        if not self.vectorstore:
-            self.create_vectorstore()
-        
-        # Find relevant documents
-        relevant_docs = self.vectorstore.similarity_search(question, k=3)
-        
-        # Build context from relevant docs
-        context = "\n\n".join([doc.page_content for doc in relevant_docs])
-        
-        # Create prompt
-        prompt = f"""Based on the following ESG standards documentation, answer this question:
+            """Query the ESG standards and get answer"""
+            if not self.vectorstore:
+                self.create_vectorstore()
+            
+            relevant_docs = self.vectorstore.similarity_search(question, k=3)
+            context = "\n\n".join([doc.page_content for doc in relevant_docs])
+            
+            prompt = f"""Based on the following ESG standards documentation, answer this question:
 
-Question: {question}
+    Question: {question}
 
-Relevant Standards:
-{context}
+    Relevant Standards:
+    {context}
 
-Provide a clear, concise answer citing specific standards when possible."""
+    Provide a clear, concise answer citing specific standards when possible."""
 
-        # Get response from Claude
-        response = self.llm.predict(prompt)
-        
-        return {
-            "answer": response,
-            "sources": [doc.metadata.get('source', 'Unknown') for doc in relevant_docs]
-        }
+            # USE .invoke() instead of .predict()
+            # The result of .invoke() is an AIMessage object, so we grab .content
+            try:
+                response = self.llm.invoke(prompt)
+                answer = response.content
+            except Exception as e:
+                print(f"Error calling Claude: {e}")
+                answer = "Error: Could not retrieve answer from Claude."
+            
+            return {
+                "answer": answer,
+                "sources": list(set([doc.metadata.get('source', 'Unknown') for doc in relevant_docs]))
+            }
 
 # Test it
 if __name__ == "__main__":

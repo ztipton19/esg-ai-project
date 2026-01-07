@@ -103,6 +103,7 @@ class ESGStandardsRAG:
                 "sources": list(set([doc.metadata.get('source', 'Unknown') for doc in relevant_docs]))
             }
 
+
 # Test it
 if __name__ == "__main__":
     rag = ESGStandardsRAG()

@@ -15,7 +15,7 @@ class ESGStandardsRAG:
         self.standards_dir = standards_dir
         self.vectorstore = None
         self.llm = ChatAnthropic(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
         )
         

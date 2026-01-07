@@ -1,6 +1,7 @@
 # RAG system for standards
 """RAG system for querying ESG standards"""
 import os
+import chromadb
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -32,31 +33,36 @@ class ESGStandardsRAG:
         
         print(f"Loaded {len(documents)} pages from standards")
         return documents
-    
+
     def create_vectorstore(self):
-        """
-        Creates a vector database if one doesn't exist; 
-        otherwise, loads the existing one from disk.
-        """
         persist_directory = "data/chroma_db"
         
-        # 1. Setup Embeddings (Always needed to either read or write to the DB)
+        # 1. Setup Embeddings
         embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",
             model_kwargs={'device': 'cpu'}
         )
 
-        # 2. Check if the database folder already exists
-        if os.path.exists(persist_directory) and os.listdir(persist_directory):
-            print(f"--- Found existing database at {persist_directory}. Loading... ---")
-            self.vectorstore = Chroma(
-                persist_directory=persist_directory, 
-                embedding_function=embeddings
-            )
+        # 2. FORCE disk connection with a PersistentClient
+        # This is the secret sauce for making sure the folder isn't empty
+        client = chromadb.PersistentClient(path=persist_directory)
+
+        # 3. Connect the LangChain wrapper to that specific client
+        self.vectorstore = Chroma(
+            client=client,
+            collection_name="esg_standards", # Using a named collection is more stable
+            embedding_function=embeddings,
+        )
+
+        # 4. Check if we actually have data inside the DB
+        # We check the database itself rather than the folder
+        existing_count = len(self.vectorstore.get()['ids'])
+
+        if existing_count > 0:
+            print(f"--- Found {existing_count} existing chunks in the database. ---")
         else:
-            print(f"--- No database found. Creating new one at {persist_directory}... ---")
+            print(f"--- Database empty. Processing PDFs into {persist_directory}... ---")
             
-            # Load and split documents only if we actually need to create the DB
             documents = self.load_documents()
             
             text_splitter = RecursiveCharacterTextSplitter(
@@ -65,12 +71,12 @@ class ESGStandardsRAG:
             )
             splits = text_splitter.split_documents(documents)
             
-            self.vectorstore = Chroma.from_documents(
-                documents=splits,
-                embedding=embeddings,
-                persist_directory=persist_directory
-            )
-            print(f"--- Database created with {len(splits)} chunks. ---")
+            # Add the documents directly to our client-backed store
+            self.vectorstore.add_documents(documents=splits)
+            
+            # Explicit verification
+            new_count = len(self.vectorstore.get()['ids'])
+            print(f"--- Success! {new_count} chunks committed to disk. ---")
         
     def query(self, question):
             """Query the ESG standards and get answer"""

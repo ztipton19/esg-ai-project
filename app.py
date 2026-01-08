@@ -57,26 +57,76 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Extract Data", "📊 Calculate Emi
 with tab1:
     st.header("📄 Extract Utility Bill Data")
     
-    bill_text = st.text_area(
-        "Paste utility bill text:",
-        height=300,
-        placeholder="Paste your utility bill text here..."
+    # Upload method selector
+    upload_method = st.radio(
+        "Choose input method:",
+        ["📎 Upload PDF", "📝 Paste Text"],
+        horizontal=True
     )
+    
+    bill_text = None
+    
+    if upload_method == "📎 Upload PDF":
+        uploaded_file = st.file_uploader(
+            "Upload utility bill PDF:",
+            type=['pdf'],
+            help="Upload a PDF utility bill (electricity, gas, water, etc.)"
+        )
+        
+        if uploaded_file is not None:
+            with st.spinner("📄 Extracting text from PDF..."):
+                try:
+                    from src.pdf_utils import extract_text_from_pdf, validate_pdf_content
+                    
+                    # Extract text
+                    bill_text = extract_text_from_pdf(uploaded_file)
+                    
+                    # Validate
+                    if validate_pdf_content(bill_text):
+                        st.success(f"✅ PDF processed successfully! ({len(bill_text)} characters extracted)")
+                        
+                        # Show preview
+                        with st.expander("📄 View Extracted Text (Click to expand)"):
+                            st.text_area(
+                                "Extracted text:",
+                                bill_text[:2000] + "..." if len(bill_text) > 2000 else bill_text,
+                                height=200,
+                                disabled=True,
+                                help="Showing first 2000 characters"
+                            )
+                    else:
+                        st.error("⚠️ PDF doesn't appear to be a utility bill. Please check the file and try again.")
+                        bill_text = None
+                        
+                except Exception as e:
+                    st.error(f"❌ Failed to process PDF: {str(e)}")
+                    bill_text = None
+    
+    else:  # Paste Text
+        bill_text = st.text_area(
+            "Paste utility bill text:",
+            height=300,
+            placeholder="Paste your utility bill text here..."
+        )
     
     region = st.selectbox(
         "Region (for emissions calculation):",
-        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"]
+        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"],
+        index=1  # Default to Arkansas
     )
     
-    if st.button("Extract & Calculate", type="primary"):
+    # Only enable button if we have bill text
+    has_bill_text = bill_text and len(bill_text.strip()) > 0
+    
+    if st.button("Extract & Calculate", type="primary", disabled=not has_bill_text):
         if bill_text:
-            with st.spinner("Processing bill..."):
+            with st.spinner("🔍 Processing bill..."):
                 from src.extract import extract_and_calculate_emissions
                 
                 result = extract_and_calculate_emissions(bill_text, region=region)
                 
                 if result["success"]:
-                    # Update costs IMMEDIATELY (before any displays)
+                    # Update costs IMMEDIATELY
                     st.session_state.total_cost += result['combined_cost']
                     st.session_state.kwh = result['extraction']['total_kwh']
                     
@@ -117,7 +167,7 @@ with tab1:
                             f"{result['emissions']['data']['emissions_mtco2e']}"
                         )
                     
-                    # === Audit Trail Display ===
+                    # Audit Trail Display
                     with st.expander("🔍 View Audit Trail & Verification"):
                         st.markdown("#### Extraction Details")
                         st.write(f"**Timestamp:** {result['extraction'].get('extraction_timestamp', 'N/A')}")
@@ -144,8 +194,8 @@ with tab1:
                         st.markdown("#### Cost Tracking")
                         st.write(f"**API Cost (This Operation):** ${result['combined_cost']:.4f}")
                     
-                    # Show full details in expander (keep this for debugging)
-                    with st.expander("View Full JSON Response"):
+                    # Full JSON for debugging
+                    with st.expander("🔧 View Full JSON Response (Debug)"):
                         st.json(result)
                 else:
                     st.error(f"❌ {result['error']}")
@@ -153,7 +203,7 @@ with tab1:
                         for w in result['warnings']:
                             st.warning(w)
         else:
-            st.warning("Please paste bill text first")
+            st.warning("⚠️ Please provide bill data first")
 
 with tab2:
     st.header("📊 Calculate Emissions")

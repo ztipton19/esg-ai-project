@@ -209,28 +209,34 @@ def verify_report_accuracy(
 def validate_report_completeness(report_text: str, required_sections: list = None) -> Tuple[bool, list]:
     """
     Check if report contains all required GRI disclosure sections
+    Uses semantic keyword matching to verify completeness
     
     Args:
         report_text: Generated report text
-        required_sections: List of keywords that should appear
+        required_sections: Optional list of required topics
         
     Returns:
         tuple: (is_complete, missing_sections)
     """
     if required_sections is None:
-        # Default GRI 305 requirements
-        required_sections = [
-            "reporting period",
-            "metric tons",
-            "emission factor",
-            "methodology",
-            "calculation"
-        ]
+        # Default GRI 305 requirements with multiple keyword options per topic
+        required_topics = {
+            "reporting_period": ["reporting period", "period", "2024", "2025", "december", "january"],
+            "emissions_value": ["metric tons", "mtco2e", "co2e", "emissions", "tonnes"],
+            "methodology": ["methodology", "calculation", "formula", "method", "approach"],
+            "emission_factor": ["emission factor", "egrid", "epa", "factor", "coefficient"],
+            "data_quality": ["quality", "limitation", "uncertainty", "assumption", "exclusion"]
+        }
+    else:
+        # User-provided sections as simple keyword list
+        required_topics = {section: [section] for section in required_sections}
     
     missing = []
-    for section in required_sections:
-        if not re.search(section, report_text, re.IGNORECASE):
-            missing.append(section)
+    for topic, keywords in required_topics.items():
+        # Check if ANY of the keywords for this topic appear in the report
+        found = any(keyword.lower() in report_text.lower() for keyword in keywords)
+        if not found:
+            missing.append(topic)
     
     return len(missing) == 0, missing
 

@@ -77,7 +77,7 @@ with tab1:
         if uploaded_file is not None:
             with st.spinner("📄 Extracting text from PDF..."):
                 try:
-                    from src.pdf_utils import extract_text_from_pdf, validate_pdf_content
+                    from src.utils import extract_text_from_pdf, validate_pdf_content
                     
                     # Extract text
                     bill_text = extract_text_from_pdf(uploaded_file)

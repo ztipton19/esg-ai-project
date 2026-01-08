@@ -1,13 +1,27 @@
 {
+  "version": "2024.1",
+  "last_updated": "2024-01-05",
+  "data_source": "EPA eGRID 2024 (Released January 2026)",
+  "gwp_reference": "IPCC Fifth Assessment Report (AR5)",
   "electricity": {
-    "US_AVERAGE": 0.855,
-    "ARKANSAS": 0.732,
-    "CALIFORNIA": 0.441,
-    "TEXAS": 0.898,
-    "unit": "kg_co2_per_kwh"
+    "unit": "kg_co2e_per_kwh",
+    "description": "Location-based emission factors for purchased electricity",
+    "scope": "Scope 2",
+    "factors": {
+      "US_AVERAGE": 0.385,
+      "ARKANSAS": 0.732,
+      "CALIFORNIA": 0.441,
+      "TEXAS": 0.898,
+      "NEW_YORK": 0.276,
+      "FLORIDA": 0.893
+    }
   },
   "natural_gas": {
-    "US_AVERAGE": 5.3,
-    "unit": "kg_co2_per_therm"
+    "unit": "kg_co2e_per_therm",
+    "description": "Direct combustion of natural gas",
+    "scope": "Scope 1",
+    "factors": {
+      "US_AVERAGE": 5.3
+    }
   }
 }

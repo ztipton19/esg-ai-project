@@ -18,6 +18,7 @@ sentence-transformers>=3.0.0
 pypdf>=4.0.0
 pandas>=2.2.0
 python-dotenv>=1.0.1
+PyPDF2>=3.0.0
 
 # UI and Framework
 streamlit>=1.31.0

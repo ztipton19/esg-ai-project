@@ -66,7 +66,7 @@ def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-202505
 
 def extract_text_from_pdf(pdf_file):
     """
-    Extract text from uploaded PDF file
+    Extract text from uploaded PDF file with robust error handling
     
     Args:
         pdf_file: Streamlit UploadedFile object
@@ -80,14 +80,44 @@ def extract_text_from_pdf(pdf_file):
         
         # Extract text from all pages
         text = ""
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            text += page_text + "\n\n"
+        for page_num, page in enumerate(pdf_reader.pages):
+            try:
+                page_text = page.extract_text()
+                
+                # Handle NullObject or None
+                if page_text and page_text.strip():
+                    text += page_text + "\n\n"
+                else:
+                    # Page might be scanned or empty
+                    text += f"[Page {page_num + 1}: No extractable text]\n\n"
+                    
+            except Exception as page_error:
+                # Skip problematic pages but continue
+                text += f"[Page {page_num + 1}: Error extracting text - {str(page_error)}]\n\n"
+                continue
+        
+        # Check if we got any usable text
+        if not text.strip() or len(text.strip()) < 50:
+            raise ValueError(
+                "Could not extract readable text from PDF. "
+                "This might be a scanned document (image-based PDF). "
+                "Please try copying the text manually or use a different PDF."
+            )
         
         return text.strip()
         
     except Exception as e:
-        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+        # More helpful error message
+        error_msg = str(e)
+        if "NullObject" in error_msg:
+            raise ValueError(
+                "This PDF appears to have formatting issues or is password-protected. "
+                "Try: (1) Copy-paste the text manually, or (2) Save the PDF from your email/browser again."
+            )
+        elif "decrypt" in error_msg.lower():
+            raise ValueError("This PDF is password-protected. Please use an unprotected version.")
+        else:
+            raise ValueError(f"Failed to extract text from PDF: {error_msg}")
 
 
 def validate_pdf_content(text, min_length=50):

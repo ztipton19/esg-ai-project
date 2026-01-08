@@ -5,6 +5,7 @@ import json
 from src.extract import extract_utility_bill_data
 from src.calculate import calculate_electricity_emissions
 from src.categorize import categorize_to_scope
+from src.utils import extract_text_from_pdf, validate_pdf_content
 
 # Page config (add at very top)
 st.set_page_config(

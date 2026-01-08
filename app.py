@@ -117,8 +117,36 @@ with tab1:
                     st.session_state.total_cost += result['combined_cost']
                     st.session_state.kwh = result['extraction']['total_kwh']
                     
-                    # Show full details in expander
-                    with st.expander("View Full Details"):
+                    # === NEW: Audit Trail Display ===
+                    with st.expander("🔍 View Audit Trail & Verification"):
+                        st.markdown("#### Extraction Details")
+                        st.write(f"**Timestamp:** {result['extraction'].get('extraction_timestamp', 'N/A')}")
+                        st.write(f"**Validation Status:** {'✅ Passed' if result['extraction'].get('validation_passed') else '⚠️ Warnings present'}")
+                        
+                        if result['extraction'].get('unit_conversion_applied'):
+                            st.write(f"**Unit Conversion:** {result['extraction']['unit_conversion_applied']}")
+                        
+                        st.markdown("#### Emissions Calculation")
+                        audit = result['emissions']['audit']
+                        st.write(f"**Formula:** `{audit['calculation_formula']}`")
+                        st.write(f"**Emission Factor:** {audit['emission_factor']} {audit['emission_factor_unit']}")
+                        st.write(f"**Source:** {audit['emission_factor_source']}")
+                        st.write(f"**GWP Reference:** {audit['gwp_reference']}")
+                        st.write(f"**Methodology:** {audit.get('methodology_note', 'N/A')}")
+                        
+                        st.markdown("#### Compliance Metadata")
+                        metadata = result['emissions']['metadata']
+                        st.write(f"**Scope:** {metadata['scope']}")
+                        st.write(f"**Standard:** {metadata['standard']}")
+                        st.write(f"**Reporting Period:** {metadata['reporting_period']}")
+                        st.write(f"**Calculation Date:** {metadata['calculation_date']}")
+                        
+                        st.markdown("#### Cost Tracking")
+                        st.write(f"**API Cost (This Operation):** ${result['combined_cost']:.4f}")
+                    # === END AUDIT TRAIL ===
+                    
+                    # Show full details in expander (keep this for debugging)
+                    with st.expander("View Full JSON Response"):
                         st.json(result)
                 else:
                     st.error(f"❌ {result['error']}")

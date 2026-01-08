@@ -2,7 +2,7 @@
 import json
 import re
 from datetime import datetime
-from src.utils import call_claude_with_cost
+from src.utils import call_claude_with_cost, extract_from_pdf_with_ai
 
 def extract_utility_bill_data(bill_text):
     """
@@ -36,7 +36,6 @@ If a field is not found, use null."""
         response, cost = call_claude_with_cost(prompt, max_tokens=512, temperature=0)
         
         # === JSON CLEANING WITH REGEX ===
-        # Remove markdown formatting if present
         json_match = re.search(r'\{.*\}', response, re.DOTALL)
         if not json_match:
             print(f"Warning: No JSON object found in response: {response[:200]}")
@@ -47,83 +46,8 @@ If a field is not found, use null."""
         # Parse JSON
         data = json.loads(json_str)
         
-        # === UNIT CONVERSION ===
-        usage_unit = data.get("usage_unit", "").upper()
-        total_usage = data.get("total_usage")
-        
-        if total_usage is None:
-            print("Warning: No usage value extracted")
-            return None
-        
-        # Convert to kWh if needed
-        if usage_unit == "MWH":
-            data["total_kwh"] = total_usage * 1000
-            data["unit_conversion_applied"] = "MWh to kWh (×1000)"
-        elif usage_unit == "KWH":
-            data["total_kwh"] = total_usage
-            data["unit_conversion_applied"] = "None (already kWh)"
-        elif usage_unit == "THERMS":
-            # Don't convert therms to kWh - they're for natural gas
-            data["total_therms"] = total_usage
-            data["unit_conversion_applied"] = "None (natural gas)"
-        else:
-            # Unknown unit - flag for review
-            data["total_kwh"] = total_usage
-            data["unit_conversion_applied"] = f"Warning: Unknown unit '{usage_unit}'"
-        
-        # === DATE VALIDATION ===
-        for date_field in ["service_start_date", "service_end_date"]:
-            date_str = data.get(date_field)
-            if date_str:
-                try:
-                    # Attempt to parse the date to validate format
-                    parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
-                    # Check if date is reasonable (not in future, not before 1990)
-                    current_year = datetime.now().year
-                    if parsed_date.year > current_year or parsed_date.year < 1990:
-                        data[f"{date_field}_warning"] = f"Unusual year: {parsed_date.year}"
-                except ValueError:
-                    # Try common alternative formats
-                    alternative_formats = ["%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d"]
-                    parsed = False
-                    for fmt in alternative_formats:
-                        try:
-                            parsed_date = datetime.strptime(date_str, fmt)
-                            data[date_field] = parsed_date.strftime("%Y-%m-%d")
-                            data[f"{date_field}_converted"] = True
-                            parsed = True
-                            break
-                        except ValueError:
-                            continue
-                    
-                    if not parsed:
-                        data[f"{date_field}_warning"] = f"Could not parse date: {date_str}"
-        
-        # === SANITY CHECK ON RATE ===
-        total_cost = data.get("total_cost")
-        total_kwh = data.get("total_kwh")
-        
-        if total_cost and total_kwh and total_kwh > 0:
-            rate_per_kwh = total_cost / total_kwh
-            data["calculated_rate_per_kwh"] = round(rate_per_kwh, 4)
-            
-            # Typical US residential rates: $0.08 - $0.40/kWh
-            # Commercial can be $0.05 - $0.50/kWh
-            if rate_per_kwh < 0.03 or rate_per_kwh > 0.60:
-                data["rate_warning"] = (
-                    f"Unusual rate: ${rate_per_kwh:.4f}/kWh. "
-                    f"Typical range: $0.05-0.50/kWh. Please verify extraction."
-                )
-        
-        # === ADD METADATA ===
-        data['extraction_cost'] = cost['total_cost']
-        data['extraction_timestamp'] = datetime.now().isoformat()
-        data['validation_passed'] = "rate_warning" not in data and all(
-            f"{field}_warning" not in data 
-            for field in ["service_start_date", "service_end_date"]
-        )
-        
-        return data
+        # Process and validate the extracted data
+        return _process_extracted_data(data, cost['total_cost'], 'Text extraction')
         
     except json.JSONDecodeError as e:
         print(f"JSON parsing error: {e}")
@@ -134,14 +58,138 @@ If a field is not found, use null."""
         return None
 
 
-def extract_and_calculate_emissions(bill_text, bill_type="electricity", region="US_AVERAGE"):
+def extract_from_pdf(pdf_file):
     """
-    Extract data from bill and calculate emissions in one step
+    Extract utility bill data directly from PDF using AI
     
-    Returns complete audit-ready result with warnings
+    Args:
+        pdf_file: Streamlit UploadedFile object
+        
+    Returns:
+        dict: Extracted data or None if failed
     """
-    # Extract data
-    extracted = extract_utility_bill_data(bill_text)
+    result = extract_from_pdf_with_ai(pdf_file)
+    
+    if not result["success"]:
+        return None
+    
+    # Process and validate the extracted data
+    return _process_extracted_data(
+        result["data"], 
+        result["cost"], 
+        'AI-powered (Claude PDF vision)'
+    )
+
+
+def _process_extracted_data(data, extraction_cost, extraction_method):
+    """
+    Common processing logic for extracted data (from text or PDF)
+    
+    Args:
+        data: Raw extracted data dict
+        extraction_cost: Cost of extraction
+        extraction_method: Method used for extraction
+        
+    Returns:
+        dict: Processed and validated data
+    """
+    # === UNIT CONVERSION ===
+    usage_unit = data.get("usage_unit", "").upper()
+    total_usage = data.get("total_usage")
+    
+    if total_usage is None:
+        print("Warning: No usage value extracted")
+        return None
+    
+    # Convert to kWh if needed
+    if usage_unit == "MWH":
+        data["total_kwh"] = total_usage * 1000
+        data["unit_conversion_applied"] = "MWh to kWh (×1000)"
+    elif usage_unit == "KWH":
+        data["total_kwh"] = total_usage
+        data["unit_conversion_applied"] = "None (already kWh)"
+    elif usage_unit == "THERMS":
+        data["total_therms"] = total_usage
+        data["unit_conversion_applied"] = "None (natural gas)"
+    else:
+        data["total_kwh"] = total_usage
+        data["unit_conversion_applied"] = f"Assumed kWh (unit: {usage_unit})"
+    
+    # === DATE VALIDATION ===
+    for date_field in ["service_start_date", "service_end_date"]:
+        date_str = data.get(date_field)
+        if date_str:
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d")
+                current_year = datetime.now().year
+                if parsed_date.year > current_year or parsed_date.year < 1990:
+                    data[f"{date_field}_warning"] = f"Unusual year: {parsed_date.year}"
+            except ValueError:
+                alternative_formats = ["%m/%d/%Y", "%m/%d/%y", "%Y/%m/%d"]
+                parsed = False
+                for fmt in alternative_formats:
+                    try:
+                        parsed_date = datetime.strptime(date_str, fmt)
+                        data[date_field] = parsed_date.strftime("%Y-%m-%d")
+                        data[f"{date_field}_converted"] = True
+                        parsed = True
+                        break
+                    except ValueError:
+                        continue
+                
+                if not parsed:
+                    data[f"{date_field}_warning"] = f"Could not parse date: {date_str}"
+    
+    # === SANITY CHECK ON RATE ===
+    total_cost = data.get("total_cost")
+    total_kwh = data.get("total_kwh")
+    
+    if total_cost and total_kwh and total_kwh > 0:
+        rate_per_kwh = total_cost / total_kwh
+        data["calculated_rate_per_kwh"] = round(rate_per_kwh, 4)
+        
+        if rate_per_kwh < 0.03 or rate_per_kwh > 0.60:
+            data["rate_warning"] = (
+                f"Unusual rate: ${rate_per_kwh:.4f}/kWh. "
+                f"Typical range: $0.05-0.50/kWh. Please verify extraction."
+            )
+    
+    # === ADD METADATA ===
+    data['extraction_cost'] = extraction_cost
+    data['extraction_timestamp'] = datetime.now().isoformat()
+    data['extraction_method'] = extraction_method
+    data['validation_passed'] = "rate_warning" not in data and all(
+        f"{field}_warning" not in data 
+        for field in ["service_start_date", "service_end_date"]
+    )
+    
+    return data
+
+
+def extract_and_calculate_emissions(bill_text=None, pdf_file=None, region="US_AVERAGE"):
+    """
+    Extract data from bill (text or PDF) and calculate emissions
+    
+    Args:
+        bill_text: Raw text from utility bill (optional if pdf_file provided)
+        pdf_file: PDF file object (optional if bill_text provided)
+        region: EPA region for emissions calculation
+        
+    Returns:
+        dict: Complete audit-ready result with warnings
+    """
+    # Extract data from either text or PDF
+    if pdf_file:
+        extracted = extract_from_pdf(pdf_file)
+    elif bill_text:
+        extracted = extract_utility_bill_data(bill_text)
+    else:
+        return {
+            "success": False,
+            "error": "Must provide either bill_text or pdf_file",
+            "extraction": None,
+            "emissions": None
+        }
     
     if not extracted:
         return {
@@ -160,7 +208,7 @@ def extract_and_calculate_emissions(bill_text, bill_type="electricity", region="
             if f"{field}_warning" in extracted:
                 warnings.append(extracted[f"{field}_warning"])
     
-    # Calculate emissions using production function
+    # Calculate emissions
     try:
         from src.calculate import calculate_electricity_emissions
         
@@ -199,11 +247,11 @@ def extract_and_calculate_emissions(bill_text, bill_type="electricity", region="
 
 if __name__ == "__main__":
     print("="*70)
-    print("UTILITY BILL EXTRACTION - PRODUCTION VERSION")
+    print("UTILITY BILL EXTRACTION - WITH AI PDF SUPPORT")
     print("="*70)
     
-    # Test Case 1: Standard kWh bill
-    print("\n[TEST 1] Standard kWh Bill")
+    # Test Case 1: Standard kWh bill (text)
+    print("\n[TEST 1] Standard kWh Bill (Text Extraction)")
     print("-"*70)
     test_bill_1 = """
     ELECTRIC COMPANY
@@ -222,14 +270,16 @@ if __name__ == "__main__":
     result = extract_utility_bill_data(test_bill_1)
     if result:
         print(f"✅ Extraction successful")
+        print(f"   Method: {result.get('extraction_method')}")
         print(f"   kWh: {result.get('total_kwh')}")
         print(f"   Cost: ${result.get('total_cost')}")
         print(f"   Rate: ${result.get('calculated_rate_per_kwh')}/kWh")
+        print(f"   API Cost: ${result.get('extraction_cost'):.4f}")
         print(f"   Validation: {'PASS' if result.get('validation_passed') else 'WARNING'}")
         if not result.get('validation_passed'):
             print(f"   ⚠️  {result.get('rate_warning', 'Date warnings present')}")
     
-    # Test Case 2: MWh bill (should auto-convert)
+    # Test Case 2: MWh bill (auto-convert)
     print("\n[TEST 2] MWh Bill (Auto-conversion)")
     print("-"*70)
     test_bill_2 = """
@@ -251,15 +301,19 @@ if __name__ == "__main__":
     # Test Case 3: Full pipeline with emissions
     print("\n[TEST 3] Full Pipeline (Extract → Calculate)")
     print("-"*70)
-    full_result = extract_and_calculate_emissions(test_bill_1, region="ARKANSAS")
+    full_result = extract_and_calculate_emissions(bill_text=test_bill_1, region="ARKANSAS")
     
     if full_result["success"]:
         print(f"✅ Pipeline successful")
         print(f"   Emissions: {full_result['emissions']['data']['emissions_mtco2e']} metric tons CO2e")
-        print(f"   Cost: ${full_result['combined_cost']:.4f}")
+        print(f"   Total Cost: ${full_result['combined_cost']:.4f}")
         if full_result["warnings"]:
             print(f"   Warnings: {len(full_result['warnings'])}")
             for w in full_result["warnings"]:
                 print(f"      - {w}")
     else:
         print(f"❌ Pipeline failed: {full_result['error']}")
+    
+    print("\n" + "="*70)
+    print("NOTE: For PDF testing, upload a PDF through the Streamlit interface")
+    print("="*70)

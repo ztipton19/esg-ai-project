@@ -2,10 +2,9 @@
 """ESG Automation System - Streamlit Interface"""
 import streamlit as st
 import json
-from src.extract import extract_utility_bill_data
+from src.extract import extract_utility_bill_data, extract_and_calculate_emissions
 from src.calculate import calculate_electricity_emissions
 from src.categorize import categorize_to_scope
-from src.utils import extract_text_from_pdf, validate_pdf_content
 
 # Page config (add at very top)
 st.set_page_config(
@@ -66,90 +65,42 @@ with tab1:
     )
     
     bill_text = None
+    pdf_file = None
     
     if upload_method == "📎 Upload PDF":
+        st.info("💡 **AI-Powered Extraction:** PDFs are processed using Claude's native document understanding (no OCR libraries needed)")
+        
         uploaded_file = st.file_uploader(
             "Upload utility bill PDF:",
             type=['pdf'],
-            help="Upload a PDF utility bill (electricity, gas, water, etc.)"
+            help="AI will read and extract data directly from your PDF"
         )
         
-        if uploaded_file is not None:
-            with st.spinner("📄 Extracting text from PDF..."):
-                try:
-                    from src.utils import extract_text_from_pdf, validate_pdf_content
-                    
-                    # Extract text
-                    bill_text = extract_text_from_pdf(uploaded_file)
-                    
-                    # === ADD DEBUG INFO HERE ===
-                    st.write("**🔍 Debug Info:**")
-                    st.write(f"- Characters extracted: {len(bill_text)}")
-                    st.write(f"- First 200 chars: `{bill_text[:200]}`")
-                    st.write(f"- Contains 'kWh': {('kwh' in bill_text.lower())}")
-                    st.write(f"- Contains 'account': {('account' in bill_text.lower())}")
-                    st.write(f"- Contains '$': {('$' in bill_text)}")
-                    st.write(f"- Contains '282': {('282' in bill_text)}")
-                    st.write(f"- Contains '46.84': {('46.84' in bill_text)}")
-                    # === END DEBUG ===
-                    
-                    # Validate
-                    if validate_pdf_content(bill_text):
-                        st.success(f"✅ PDF processed successfully! ({len(bill_text)} characters extracted)")
-                        
-                        # Show preview
-                        with st.expander("📄 View Extracted Text (Click to expand)"):
-                            st.text_area(
-                                "Extracted text:",
-                                bill_text[:2000] + "..." if len(bill_text) > 2000 else bill_text,
-                                height=200,
-                                disabled=True,
-                                help="Showing first 2000 characters"
-                            )
-                    else:
-                        st.error("⚠️ PDF doesn't appear to be a utility bill. Please check the file and try again.")
-                        
-                        # Show what was extracted anyway for debugging
-                        with st.expander("🔍 View extracted text anyway"):
-                            st.text_area("Raw text:", bill_text[:1000], height=200)
-                        
-                        bill_text = None
-                        
-                except Exception as e:
-                    st.error(f"❌ Failed to process PDF: {str(e)}")
-                    bill_text = None
-    
-    else:  # Paste Text
-        bill_text = st.text_area(
-            "Paste utility bill text:",
-            height=300,
-            placeholder="Paste your utility bill text here..."
+        region = st.selectbox(
+            "Region (for emissions calculation):",
+            ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"],
+            index=1,  # Default to Arkansas
+            key="pdf_region"
         )
-    
-    region = st.selectbox(
-        "Region (for emissions calculation):",
-        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"],
-        index=1  # Default to Arkansas
-    )
-    
-    # Only enable button if we have bill text
-    has_bill_text = bill_text and len(bill_text.strip()) > 0
-    
-    if st.button("Extract & Calculate", type="primary", disabled=not has_bill_text):
-        if bill_text:
-            with st.spinner("🔍 Processing bill..."):
+        
+        if uploaded_file is not None and st.button("🤖 Extract from PDF", type="primary"):
+            with st.spinner("🤖 AI is reading your PDF..."):
                 from src.extract import extract_and_calculate_emissions
                 
-                result = extract_and_calculate_emissions(bill_text, region=region)
+                # Use AI-powered PDF extraction
+                result = extract_and_calculate_emissions(pdf_file=uploaded_file, region=region)
                 
                 if result["success"]:
                     # Update costs IMMEDIATELY
                     st.session_state.total_cost += result['combined_cost']
                     st.session_state.kwh = result['extraction']['total_kwh']
                     
-                    st.success("✅ Extraction successful!")
+                    st.success("✅ AI extraction successful!")
                     
-                    # Show warnings if any
+                    # Show extraction method
+                    st.info(f"📄 Method: {result['extraction'].get('extraction_method', 'Unknown')}")
+                    
+                    # Show warnings
                     if result["warnings"]:
                         for warning in result["warnings"]:
                             st.warning(warning)
@@ -184,10 +135,11 @@ with tab1:
                             f"{result['emissions']['data']['emissions_mtco2e']}"
                         )
                     
-                    # Audit Trail Display
+                    # Audit Trail
                     with st.expander("🔍 View Audit Trail & Verification"):
                         st.markdown("#### Extraction Details")
                         st.write(f"**Timestamp:** {result['extraction'].get('extraction_timestamp', 'N/A')}")
+                        st.write(f"**Method:** {result['extraction'].get('extraction_method', 'N/A')}")
                         st.write(f"**Validation Status:** {'✅ Passed' if result['extraction'].get('validation_passed') else '⚠️ Warnings present'}")
                         
                         if result['extraction'].get('unit_conversion_applied'):
@@ -210,8 +162,9 @@ with tab1:
                         
                         st.markdown("#### Cost Tracking")
                         st.write(f"**API Cost (This Operation):** ${result['combined_cost']:.4f}")
+                        st.caption("💡 Note: PDF extraction costs ~$0.02-0.04 per document. For high-volume production (>1,000 bills/month), consider hybrid approach with local OCR models (see v2.0 roadmap).")
                     
-                    # Full JSON for debugging
+                    # Full JSON
                     with st.expander("🔧 View Full JSON Response (Debug)"):
                         st.json(result)
                 else:
@@ -219,8 +172,110 @@ with tab1:
                     if result.get('warnings'):
                         for w in result['warnings']:
                             st.warning(w)
-        else:
-            st.warning("⚠️ Please provide bill data first")
+    
+    else:  # Paste Text
+        bill_text = st.text_area(
+            "Paste utility bill text:",
+            height=300,
+            placeholder="Paste your utility bill text here..."
+        )
+        
+        region = st.selectbox(
+            "Region (for emissions calculation):",
+            ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"],
+            index=1,  # Default to Arkansas
+            key="text_region"
+        )
+        
+        has_bill_text = bill_text and len(bill_text.strip()) > 0
+        
+        if st.button("Extract & Calculate", type="primary", disabled=not has_bill_text):
+            if bill_text:
+                with st.spinner("🔍 Processing bill..."):
+                    from src.extract import extract_and_calculate_emissions
+                    
+                    result = extract_and_calculate_emissions(bill_text=bill_text, region=region)
+                    
+                    if result["success"]:
+                        # Update costs IMMEDIATELY
+                        st.session_state.total_cost += result['combined_cost']
+                        st.session_state.kwh = result['extraction']['total_kwh']
+                        
+                        st.success("✅ Extraction successful!")
+                        
+                        # Show warnings if any
+                        if result["warnings"]:
+                            for warning in result["warnings"]:
+                                st.warning(warning)
+                        
+                        # Display extracted data
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric(
+                                "Usage",
+                                f"{result['extraction']['total_kwh']:.0f} kWh"
+                            )
+                            st.caption(result['extraction'].get('unit_conversion_applied', 'No conversion'))
+                        
+                        with col2:
+                            st.metric(
+                                "Cost",
+                                f"${result['extraction']['total_cost']:.2f}"
+                            )
+                            st.caption(f"Rate: ${result['extraction'].get('calculated_rate_per_kwh', 0):.3f}/kWh")
+                        
+                        # Display emissions
+                        st.subheader("📊 Calculated Emissions")
+                        col3, col4 = st.columns(2)
+                        with col3:
+                            st.metric(
+                                "CO2 Emissions",
+                                f"{result['emissions']['data']['emissions_kg_co2e']} kg"
+                            )
+                        with col4:
+                            st.metric(
+                                "Metric Tons CO2e",
+                                f"{result['emissions']['data']['emissions_mtco2e']}"
+                            )
+                        
+                        # Audit Trail
+                        with st.expander("🔍 View Audit Trail & Verification"):
+                            st.markdown("#### Extraction Details")
+                            st.write(f"**Timestamp:** {result['extraction'].get('extraction_timestamp', 'N/A')}")
+                            st.write(f"**Method:** {result['extraction'].get('extraction_method', 'N/A')}")
+                            st.write(f"**Validation Status:** {'✅ Passed' if result['extraction'].get('validation_passed') else '⚠️ Warnings present'}")
+                            
+                            if result['extraction'].get('unit_conversion_applied'):
+                                st.write(f"**Unit Conversion:** {result['extraction']['unit_conversion_applied']}")
+                            
+                            st.markdown("#### Emissions Calculation")
+                            audit = result['emissions']['audit']
+                            st.write(f"**Formula:** `{audit['calculation_formula']}`")
+                            st.write(f"**Emission Factor:** {audit['emission_factor']} {audit['emission_factor_unit']}")
+                            st.write(f"**Source:** {audit['emission_factor_source']}")
+                            st.write(f"**GWP Reference:** {audit['gwp_reference']}")
+                            st.write(f"**Methodology:** {audit.get('methodology_note', 'N/A')}")
+                            
+                            st.markdown("#### Compliance Metadata")
+                            metadata = result['emissions']['metadata']
+                            st.write(f"**Scope:** {metadata['scope']}")
+                            st.write(f"**Standard:** {metadata['standard']}")
+                            st.write(f"**Reporting Period:** {metadata['reporting_period']}")
+                            st.write(f"**Calculation Date:** {metadata['calculation_date']}")
+                            
+                            st.markdown("#### Cost Tracking")
+                            st.write(f"**API Cost (This Operation):** ${result['combined_cost']:.4f}")
+                        
+                        # Full JSON
+                        with st.expander("🔧 View Full JSON Response (Debug)"):
+                            st.json(result)
+                    else:
+                        st.error(f"❌ {result['error']}")
+                        if result.get('warnings'):
+                            for w in result['warnings']:
+                                st.warning(w)
+            else:
+                st.warning("⚠️ Please provide bill data first")
 
 with tab2:
     st.header("📊 Calculate Emissions")

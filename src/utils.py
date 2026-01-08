@@ -2,6 +2,8 @@
 import os
 from dotenv import load_dotenv
 import anthropic
+import PyPDF2
+from io import BytesIO
 
 # Load environment variables
 load_dotenv()
@@ -57,6 +59,63 @@ def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-202505
     }
     
     return response.content[0].text, cost_info
+
+# ============================================================================
+# PDF UTILITIES
+# ============================================================================
+
+def extract_text_from_pdf(pdf_file):
+    """
+    Extract text from uploaded PDF file
+    
+    Args:
+        pdf_file: Streamlit UploadedFile object
+        
+    Returns:
+        str: Extracted text from all pages
+    """
+    try:
+        # Read PDF from uploaded file
+        pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_file.read()))
+        
+        # Extract text from all pages
+        text = ""
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            text += page_text + "\n\n"
+        
+        return text.strip()
+        
+    except Exception as e:
+        raise ValueError(f"Failed to extract text from PDF: {str(e)}")
+
+
+def validate_pdf_content(text, min_length=50):
+    """
+    Validate that extracted text is usable
+    
+    Args:
+        text: Extracted text
+        min_length: Minimum character length
+        
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    if not text or len(text) < min_length:
+        return False
+    
+    # Check for common utility bill keywords
+    utility_keywords = [
+        "account", "bill", "kwh", "usage", "electric",
+        "water", "gas", "service", "charge", "total",
+        "meter", "billing", "due", "payment"
+    ]
+    
+    text_lower = text.lower()
+    found_keywords = sum(1 for kw in utility_keywords if kw in text_lower)
+    
+    # Should have at least 3 utility-related keywords
+    return found_keywords >= 3
 
 # Test it
 if __name__ == "__main__":

@@ -157,7 +157,7 @@ with tab1:
             st.warning("Please paste bill text first")
 
 with tab2:
-    st.header("Calculate Emissions")
+    st.header("📊 Calculate Emissions")
     
     kwh = st.number_input(
         "kWh Usage:",
@@ -168,28 +168,49 @@ with tab2:
     
     region = st.selectbox(
         "Region:",
-        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS"],
-        index=0
+        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"],
+        key="calc_region"
     )
     
-    if st.button("Calculate Emissions", type="primary", key="calc_btn"):
+    if st.button("Calculate Emissions", type="primary"):
         if kwh > 0:
-            try:
-                result = calculate_electricity_emissions(kwh, region)
+            from src.calculate import calculate_electricity_emissions
+            
+            result = calculate_electricity_emissions(kwh, region)
+            
+            st.success("✅ Emissions calculated!")
+            
+            # Display results using new structure
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(
+                    "CO2 Emissions", 
+                    f"{result['data']['emissions_kg_co2e']} kg"
+                )
+            with col2:
+                st.metric(
+                    "Metric Tons CO2e", 
+                    f"{result['data']['emissions_mtco2e']} MT"
+                )
+            
+            # Show calculation details
+            st.subheader("Calculation Details")
+            st.code(result['audit']['calculation_formula'])
+            
+            # Show full audit trail
+            with st.expander("🔍 View Complete Audit Trail"):
+                st.markdown("#### Calculation Metadata")
+                st.write(f"**Scope:** {result['metadata']['scope']}")
+                st.write(f"**Standard:** {result['metadata']['standard']}")
+                st.write(f"**Inventory Year:** {result['metadata']['inventory_year']}")
                 
-                st.success("Emissions calculated!")
+                st.markdown("#### Emission Factor Details")
+                st.write(f"**Factor:** {result['audit']['emission_factor']} {result['audit']['emission_factor_unit']}")
+                st.write(f"**Source:** {result['audit']['emission_factor_source']}")
+                st.write(f"**GWP Reference:** {result['audit']['gwp_reference']}")
+                st.write(f"**Methodology:** {result['audit']['methodology_note']}")
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("CO2 Emissions", f"{result['kg_co2']} kg")
-                with col2:
-                    st.metric("Metric Tons CO2", f"{result['metric_tons_co2']} MT")
-                
-                with st.expander("View Calculation Details"):
-                    st.json(result)
-                    
-            except ValueError as e:
-                st.error(f"Error: {e}")
+                st.json(result)
         else:
             st.warning("Enter kWh value first")
 

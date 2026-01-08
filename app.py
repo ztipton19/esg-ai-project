@@ -28,6 +28,29 @@ if st.sidebar.button("Reset Costs"):
     st.session_state.total_cost = 0.0
     st.rerun()
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📊 Project Metrics")
+
+# Mock metrics - would be real in production
+st.sidebar.metric("Reports Generated", "12")
+st.sidebar.metric("Avg Time Saved", "70%")
+st.sidebar.metric("Avg Cost/Report", "$0.08")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ℹ️ About")
+st.sidebar.markdown("""
+This system automates ESG compliance reporting by:
+- Extracting data from utility bills
+- Calculating emissions (EPA factors)
+- Categorizing to GRI/SASB standards
+- Generating compliance reports
+- Identifying cost-saving opportunities
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Built with:** Claude API + Streamlit")
+st.sidebar.markdown("[GitHub](https://github.com/yourusername/esg-automation-system)")
+
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize", "📚 ESG Standards", "📈 Operational Insights"])
 

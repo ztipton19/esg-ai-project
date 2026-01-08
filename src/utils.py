@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 import anthropic
-import PyPDF2
+import base64
 from io import BytesIO
 
 # Load environment variables
@@ -24,6 +24,7 @@ def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-202505
         max_tokens: Maximum tokens in response
         model: Claude model to use
         system_prompt: Optional system-level instructions
+        temperature: Randomness (0=deterministic, 1=creative). Default 0 for accuracy
         
     Returns:
         tuple: (response_text, cost_info_dict)
@@ -34,6 +35,7 @@ def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-202505
     api_params = {
         "model": model,
         "max_tokens": max_tokens,
+        "temperature": temperature,
         "messages": [{"role": "user", "content": prompt}]
     }
     
@@ -60,13 +62,142 @@ def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-202505
     
     return response.content[0].text, cost_info
 
+
 # ============================================================================
-# PDF UTILITIES
+# PDF UTILITIES - AI-POWERED EXTRACTION
 # ============================================================================
 
-def extract_text_from_pdf(pdf_file):
+def pdf_to_base64(pdf_file):
     """
-    Extract text from uploaded PDF file with robust error handling
+    Convert uploaded PDF to base64 for Claude API
+    
+    Args:
+        pdf_file: Streamlit UploadedFile object
+        
+    Returns:
+        str: Base64 encoded PDF
+    """
+    pdf_bytes = pdf_file.read()
+    return base64.standard_b64encode(pdf_bytes).decode('utf-8')
+
+
+def extract_from_pdf_with_ai(pdf_file):
+    """
+    Extract utility bill data directly from PDF using Claude's native PDF support
+    
+    This uses Claude's document understanding capabilities to read PDFs directly,
+    bypassing traditional OCR libraries. More reliable for complex layouts and scanned documents.
+    
+    Args:
+        pdf_file: Streamlit UploadedFile object
+        
+    Returns:
+        dict: Extracted data or error information
+        
+    Cost: ~$0.02-0.04 per PDF (higher than text extraction, but more reliable)
+    
+    Note: For production scale (>1,000 bills/month), consider implementing a hybrid
+    approach with open-source OCR models (see v2.0 roadmap).
+    """
+    # Convert PDF to base64
+    pdf_base64 = pdf_to_base64(pdf_file)
+    
+    # Create extraction prompt
+    prompt = """Extract utility bill information from this PDF and return as valid JSON.
+
+Extract these fields:
+- account_number (string)
+- service_start_date (YYYY-MM-DD format)
+- service_end_date (YYYY-MM-DD format)
+- total_usage (number - the actual value shown on the bill)
+- usage_unit (string - "kWh", "MWh", "therms", etc.)
+- total_cost (number - dollars, no $ symbol)
+
+CRITICAL: Return ONLY the raw JSON object with no markdown, no backticks, no explanatory text.
+If a field is not found, use null.
+
+Example format:
+{"account_number": "123456", "service_start_date": "2024-11-01", "service_end_date": "2024-11-30", "total_usage": 850, "usage_unit": "kWh", "total_cost": 127.50}"""
+
+    try:
+        client = get_claude_client()
+        
+        # Call Claude with PDF document
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1024,
+            temperature=0,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_base64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        )
+        
+        # Calculate cost
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        extraction_cost = (input_tokens / 1_000_000) * 3.00 + (output_tokens / 1_000_000) * 15.00
+        
+        # Parse response
+        response_text = response.content[0].text
+        
+        # Clean JSON (remove markdown if present)
+        import re
+        import json
+        
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if not json_match:
+            return {
+                "success": False,
+                "error": "AI could not extract structured data from PDF",
+                "cost": extraction_cost
+            }
+        
+        data = json.loads(json_match.group())
+        
+        # Add metadata
+        data['extraction_cost'] = extraction_cost
+        data['extraction_method'] = 'AI-powered (Claude PDF vision)'
+        
+        return {
+            "success": True,
+            "data": data,
+            "cost": extraction_cost
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"AI extraction failed: {str(e)}",
+            "cost": 0
+        }
+
+
+# ============================================================================
+# LEGACY PDF EXTRACTION (Fallback - not recommended)
+# ============================================================================
+
+def extract_text_from_pdf_legacy(pdf_file):
+    """
+    Legacy text extraction using PyPDF2
+    
+    NOTE: This often fails with complex PDFs. Use extract_from_pdf_with_ai() instead.
+    Kept for backwards compatibility only.
     
     Args:
         pdf_file: Streamlit UploadedFile object
@@ -75,6 +206,8 @@ def extract_text_from_pdf(pdf_file):
         str: Extracted text from all pages
     """
     try:
+        import PyPDF2
+        
         # Read PDF from uploaded file
         pdf_reader = PyPDF2.PdfReader(BytesIO(pdf_file.read()))
         
@@ -84,79 +217,26 @@ def extract_text_from_pdf(pdf_file):
             try:
                 page_text = page.extract_text()
                 
-                # Handle NullObject or None
                 if page_text and page_text.strip():
                     text += page_text + "\n\n"
                 else:
-                    # Page might be scanned or empty
                     text += f"[Page {page_num + 1}: No extractable text]\n\n"
                     
             except Exception as page_error:
-                # Skip problematic pages but continue
                 text += f"[Page {page_num + 1}: Error extracting text - {str(page_error)}]\n\n"
                 continue
         
-        # Check if we got any usable text
         if not text.strip() or len(text.strip()) < 50:
             raise ValueError(
                 "Could not extract readable text from PDF. "
-                "This might be a scanned document (image-based PDF). "
-                "Please try copying the text manually or use a different PDF."
+                "Please use AI-powered extraction instead."
             )
         
         return text.strip()
         
     except Exception as e:
-        # More helpful error message
-        error_msg = str(e)
-        if "NullObject" in error_msg:
-            raise ValueError(
-                "This PDF appears to have formatting issues or is password-protected. "
-                "Try: (1) Copy-paste the text manually, or (2) Save the PDF from your email/browser again."
-            )
-        elif "decrypt" in error_msg.lower():
-            raise ValueError("This PDF is password-protected. Please use an unprotected version.")
-        else:
-            raise ValueError(f"Failed to extract text from PDF: {error_msg}")
+        raise ValueError(f"Legacy PDF extraction failed: {str(e)}")
 
-
-def validate_pdf_content(text, min_length=50):
-    """
-    Validate that extracted text is usable
-    
-    Args:
-        text: Extracted text
-        min_length: Minimum character length
-        
-    Returns:
-        bool: True if valid, False otherwise
-    """
-    if not text or len(text) < min_length:
-        return False
-    
-    # Check for common utility bill keywords (case-insensitive)
-    utility_keywords = [
-        "account", "bill", "kwh", "usage", "electric",
-        "water", "gas", "service", "charge", "total",
-        "meter", "billing", "due", "payment", "amount",
-        "current", "balance", "customer"
-    ]
-    
-    text_lower = text.lower()
-    found_keywords = sum(1 for kw in utility_keywords if kw in text_lower)
-    
-    # Only need 2 keywords now (less strict)
-    if found_keywords >= 2:
-        return True
-    
-    # Also check for numeric patterns common in bills
-    import re
-    has_dollar_amounts = bool(re.search(r'\$\s*\d+\.\d{2}', text))
-    has_kwh = 'kwh' in text_lower
-    has_account = 'account' in text_lower or '#' in text
-    
-    # If it has money + (kWh or account), it's probably a bill
-    return has_dollar_amounts and (has_kwh or has_account)
 
 # Test it
 if __name__ == "__main__":

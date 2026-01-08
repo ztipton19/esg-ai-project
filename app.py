@@ -82,6 +82,17 @@ with tab1:
                     # Extract text
                     bill_text = extract_text_from_pdf(uploaded_file)
                     
+                    # === ADD DEBUG INFO HERE ===
+                    st.write("**🔍 Debug Info:**")
+                    st.write(f"- Characters extracted: {len(bill_text)}")
+                    st.write(f"- First 200 chars: `{bill_text[:200]}`")
+                    st.write(f"- Contains 'kWh': {('kwh' in bill_text.lower())}")
+                    st.write(f"- Contains 'account': {('account' in bill_text.lower())}")
+                    st.write(f"- Contains '$': {('$' in bill_text)}")
+                    st.write(f"- Contains '282': {('282' in bill_text)}")
+                    st.write(f"- Contains '46.84': {('46.84' in bill_text)}")
+                    # === END DEBUG ===
+                    
                     # Validate
                     if validate_pdf_content(bill_text):
                         st.success(f"✅ PDF processed successfully! ({len(bill_text)} characters extracted)")
@@ -97,6 +108,11 @@ with tab1:
                             )
                     else:
                         st.error("⚠️ PDF doesn't appear to be a utility bill. Please check the file and try again.")
+                        
+                        # Show what was extracted anyway for debugging
+                        with st.expander("🔍 View extracted text anyway"):
+                            st.text_area("Raw text:", bill_text[:1000], height=200)
+                        
                         bill_text = None
                         
                 except Exception as e:

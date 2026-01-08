@@ -32,7 +32,7 @@ if st.sidebar.button("Reset Costs"):
 tab1, tab2, tab3, tab4 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize", "📚 ESG Standards"])
 
 with tab1:
-    st.header("Extract Utility Bill Data")
+    st.header("📄 Extract Utility Bill Data")
     
     bill_text = st.text_area(
         "Paste utility bill text:",
@@ -40,33 +40,68 @@ with tab1:
         placeholder="Paste your utility bill text here..."
     )
     
-    if st.button("Extract Data", type="primary", key="extract_btn"):
+    region = st.selectbox(
+        "Region (for emissions calculation):",
+        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"]
+    )
+    
+    if st.button("Extract & Calculate", type="primary"):
         if bill_text:
-            with st.spinner("Extracting data..."):
-                result = extract_utility_bill_data(bill_text)
+            with st.spinner("Processing bill..."):
+                from src.extract import extract_and_calculate_emissions
                 
-                if result:
-                    st.session_state.total_cost += result.get('extraction_cost', 0)
+                result = extract_and_calculate_emissions(bill_text, region=region)
+                
+                if result["success"]:
+                    st.success("✅ Extraction successful!")
                     
-                    st.success("Data extracted successfully!")
+                    # Show warnings if any
+                    if result["warnings"]:
+                        for warning in result["warnings"]:
+                            st.warning(warning)
                     
-                    # Display key metrics in columns
-                    col1, col2, col3 = st.columns(3)
+                    # Display extracted data
+                    col1, col2 = st.columns(2)
                     with col1:
-                        st.metric("kWh Usage", result.get('total_kwh', 'N/A'))
+                        st.metric(
+                            "Usage",
+                            f"{result['extraction']['total_kwh']:.0f} kWh"
+                        )
+                        st.caption(result['extraction'].get('unit_conversion_applied', 'No conversion'))
+                    
                     with col2:
-                        st.metric("Total Cost", f"${result.get('total_cost', 0):.2f}")
+                        st.metric(
+                            "Cost",
+                            f"${result['extraction']['total_cost']:.2f}"
+                        )
+                        st.caption(f"Rate: ${result['extraction'].get('calculated_rate_per_kwh', 0):.3f}/kWh")
+                    
+                    # Display emissions
+                    st.subheader("📊 Calculated Emissions")
+                    col3, col4 = st.columns(2)
                     with col3:
-                        st.metric("API Cost", f"${result.get('extraction_cost', 0):.4f}")
+                        st.metric(
+                            "CO2 Emissions",
+                            f"{result['emissions']['data']['emissions_kg_co2e']} kg"
+                        )
+                    with col4:
+                        st.metric(
+                            "Metric Tons CO2e",
+                            f"{result['emissions']['data']['emissions_mtco2e']}"
+                        )
                     
-                    # Show full data
-                    with st.expander("View Full Extracted Data"):
+                    # Update session state
+                    st.session_state.total_cost += result['combined_cost']
+                    st.session_state.kwh = result['extraction']['total_kwh']
+                    
+                    # Show full details in expander
+                    with st.expander("View Full Details"):
                         st.json(result)
-                    
-                    # Store for next tab
-                    st.session_state.kwh = result.get('total_kwh', 0)
                 else:
-                    st.error("Failed to extract data")
+                    st.error(f"❌ {result['error']}")
+                    if result.get('warnings'):
+                        for w in result['warnings']:
+                            st.warning(w)
         else:
             st.warning("Please paste bill text first")
 

@@ -13,7 +13,7 @@ def get_claude_client():
         raise ValueError("ANTHROPIC_API_KEY not found in .env file")
     return anthropic.Anthropic(api_key=api_key)
 
-def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-20250514", temperature=0):
+def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-20250514", system_prompt=None):
     """
     Make Claude API call and track costs
     
@@ -21,17 +21,25 @@ def call_claude_with_cost(prompt, max_tokens=1024, model="claude-sonnet-4-202505
         prompt: Text prompt for Claude
         max_tokens: Maximum tokens in response
         model: Claude model to use
+        system_prompt: Optional system-level instructions
         
     Returns:
         tuple: (response_text, cost_info_dict)
     """
     client = get_claude_client()
     
-    response = client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    # Build API call parameters
+    api_params = {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    # Add system prompt if provided
+    if system_prompt:
+        api_params["system"] = system_prompt
+    
+    response = client.messages.create(**api_params)
     
     # Extract usage info
     input_tokens = response.usage.input_tokens

@@ -153,14 +153,23 @@ Format as a single professional disclosure section suitable for inclusion in a s
     }
 
 
-# Test with validation
+# In src/reports.py, update the __main__ section:
+
 if __name__ == "__main__":
-    # Test case 1: Valid data
+    print("="*70)
+    print("GRI REPORT GENERATION - PRODUCTION VERSION")
+    print("="*70)
+    
+    # Test case 1: Standard report (no comparison)
+    print("\n[TEST 1] Standard Report")
+    print("-"*70)
     test_data = {
         "reporting_period": "December 2024",
+        "service_start_date": "2024-12-01",
+        "service_end_date": "2024-12-31",
         "total_kwh": 850,
         "region": "Arkansas",
-        "metric_tons_co2": 0.622,
+        "metric_tons_co2": 0.6222,
         "emission_factor_used": 0.732,
         "emission_factor_source": "EPA eGRID 2024",
         "emission_factor_unit": "kg CO2e per kWh",
@@ -168,22 +177,64 @@ if __name__ == "__main__":
         "calculation_method": "850 kWh × 0.732 kg CO2e/kWh = 622.2 kg CO2e"
     }
     
-    # Test case 2: With comparison
-    prev_data = {
-        "metric_tons_co2": 0.673
-    }
+    result = generate_gri_report_section(test_data, "Scope 2")
+    
+    print(f"Status: {'✅ PASS' if result['validation_passed'] else '❌ FAIL'}")
+    print(f"Cost: ${result['cost']:.4f}")
+    print(f"Warnings: {len(result['warnings'])}")
+    
+    if result['warnings']:
+        for w in result['warnings']:
+            print(f"  - {w}")
+    
+# Test case 2: With year-over-year comparison
+    print("\n[TEST 2] Report with YoY Comparison")
+    print("-"*70)
+    prev_data = {"metric_tons_co2": 0.673}
     
     result = generate_gri_report_section(test_data, "Scope 2", prev_data)
     
-    print("="*60)
-    print("VALIDATION STATUS:", "✅ PASS" if result["validation_passed"] else "❌ FAIL")
-    print("="*60)
+    print(f"Status: {'✅ PASS' if result['validation_passed'] else '❌ FAIL'}")
     
-    if result["warnings"]:
-        print("\nWARNINGS:")
-        for w in result["warnings"]:
-            print(f"  - {w}")
+    # Add safety check for None
+    if result['report_text']:
+        print(f"YoY in report: {'Yes' if 'previous period' in result['report_text'].lower() else 'No'}")
+    else:
+        print(f"YoY in report: N/A (report generation failed)")
     
-    print(f"\nREPORT TEXT:\n{result['report_text']}")
-    print(f"\nCost: ${result['cost']:.4f}")
-    print(f"\nAudit Trail: {json.dumps(result['audit_trail'], indent=2)}")
+    # Test case 3: Comparison with zero previous period
+    print("\n[TEST 3] Comparison with Zero Baseline")
+    print("-"*70)
+    zero_prev = {"metric_tons_co2": 0}
+    
+    result = generate_gri_report_section(test_data, "Scope 2", zero_prev)
+    
+    print(f"Status: {'✅ PASS' if result['validation_passed'] else '❌ FAIL'}")
+    
+    # Add safety check
+    if result['report_text']:
+        print(f"Handled zero baseline: {'Yes' if 'baseline' in result['report_text'].lower() else 'No'}")
+    else:
+        print(f"Handled zero baseline: N/A (report generation failed)")
+    
+    # Test case 4: Missing previous data
+    print("\n[TEST 4] Incomplete Comparison Data")
+    print("-"*70)
+    incomplete_prev = {}  # Empty dict
+    
+    result = generate_gri_report_section(test_data, "Scope 2", incomplete_prev)
+    
+    print(f"Status: {'✅ PASS' if result['validation_passed'] else '❌ FAIL'}")
+    print(f"Handled gracefully: {'Yes' if result['report_text'] else 'No'}")
+    
+    # Show one full report (only if it exists)
+    if result['report_text']:
+        print("\n[SAMPLE REPORT]")
+        print("="*70)
+        print(result['report_text'])
+        print("="*70)
+    else:
+        print("\n[SAMPLE REPORT]")
+        print("="*70)
+        print("Report generation failed - see warnings above")
+        print("="*70)

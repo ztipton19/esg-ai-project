@@ -134,18 +134,29 @@ def validate_pdf_content(text, min_length=50):
     if not text or len(text) < min_length:
         return False
     
-    # Check for common utility bill keywords
+    # Check for common utility bill keywords (case-insensitive)
     utility_keywords = [
         "account", "bill", "kwh", "usage", "electric",
         "water", "gas", "service", "charge", "total",
-        "meter", "billing", "due", "payment"
+        "meter", "billing", "due", "payment", "amount",
+        "current", "balance", "customer"
     ]
     
     text_lower = text.lower()
     found_keywords = sum(1 for kw in utility_keywords if kw in text_lower)
     
-    # Should have at least 3 utility-related keywords
-    return found_keywords >= 3
+    # Only need 2 keywords now (less strict)
+    if found_keywords >= 2:
+        return True
+    
+    # Also check for numeric patterns common in bills
+    import re
+    has_dollar_amounts = bool(re.search(r'\$\s*\d+\.\d{2}', text))
+    has_kwh = 'kwh' in text_lower
+    has_account = 'account' in text_lower or '#' in text
+    
+    # If it has money + (kWh or account), it's probably a bill
+    return has_dollar_amounts and (has_kwh or has_account)
 
 # Test it
 if __name__ == "__main__":

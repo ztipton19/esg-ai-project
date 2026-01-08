@@ -29,7 +29,7 @@ if st.sidebar.button("Reset Costs"):
     st.rerun()
 
 # Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize", "📚 ESG Standards"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize", "📚 ESG Standards", "📈 Operational Insights"])
 
 with tab1:
     st.header("📄 Extract Utility Bill Data")
@@ -208,6 +208,65 @@ with tab4:
                 st.info("💡 This answer was generated using RAG (Retrieval-Augmented Generation) over official GRI and SASB standards.")
         else:
             st.warning("Please enter a question first")
+
+with tab5:
+    st.header("📈 Operational Insights")
+    
+    # Mock data for now - in real version, load from database
+    monthly_data = {
+        "November": {"kwh": 920, "cost": 138.50, "co2_kg": 673},
+        "December": {"kwh": 850, "cost": 127.50, "co2_kg": 622}
+    }
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        kwh_change = ((850 - 920) / 920) * 100
+        st.metric(
+            "kWh Usage",
+            "850 kWh",
+            f"{kwh_change:.1f}% vs last month",
+            delta_color="inverse"
+        )
+    
+    with col2:
+        cost_change = ((127.50 - 138.50) / 138.50) * 100
+        st.metric(
+            "Cost",
+            "$127.50",
+            f"{cost_change:.1f}% vs last month",
+            delta_color="inverse"
+        )
+    
+    with col3:
+        co2_change = ((622 - 673) / 673) * 100
+        st.metric(
+            "CO2 Emissions",
+            "622 kg",
+            f"{co2_change:.1f}% vs last month",
+            delta_color="inverse"
+        )
+    
+    st.subheader("💡 Cost-Saving Opportunities")
+    
+    # Use Claude to generate insights
+    if st.button("Generate Insights"):
+        prompt = """Analyze this energy usage data and provide 3 specific cost-saving recommendations:
+
+Current Month: 850 kWh, $127.50, 622 kg CO2
+Previous Month: 920 kWh, $138.50, 673 kg CO2
+Region: Arkansas
+
+Format as bullet points, each with:
+- Recommendation
+- Estimated savings
+- Implementation difficulty"""
+
+        from src.utils import call_claude_with_cost
+        insights, cost = call_claude_with_cost(prompt)
+        
+        st.markdown(insights)
+        st.caption(f"Analysis cost: ${cost['total_cost']:.4f}")
             
 # Footer
 st.markdown("---")

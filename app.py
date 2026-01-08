@@ -143,7 +143,7 @@ with tab4:
     
     question = st.text_input(
         "Ask about ESG standards:",
-        placeholder="e.g., What is Scope 2 emissions? How should companies report electricity?"
+        placeholder="e.g., What are Scope 2 emissions? How should companies report electricity?"
     )
     
     if st.button("Search Standards", type="primary"):

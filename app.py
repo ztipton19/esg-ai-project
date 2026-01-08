@@ -29,7 +29,7 @@ if st.sidebar.button("Reset Costs"):
     st.rerun()
 
 # Tabs
-tab1, tab2, tab3 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize"])
+tab1, tab2, tab3, tab4 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize", "📚 ESG Standards"])
 
 with tab1:
     st.header("Extract Utility Bill Data")
@@ -137,6 +137,43 @@ with tab3:
         else:
             st.warning("Enter activity description first")
 
+with tab4:
+    st.header("📚 Query ESG Standards")
+    st.markdown("Ask questions about GRI and SASB standards. Answers are sourced from official documentation.")
+    
+    question = st.text_input(
+        "Ask about ESG standards:",
+        placeholder="e.g., What is Scope 2 emissions? How should companies report electricity?"
+    )
+    
+    if st.button("Search Standards", type="primary"):
+        if question:
+            with st.spinner("Searching ESG standards documentation..."):
+                from src.rag import ESGStandardsRAG
+                
+                # Initialize RAG system
+                rag = ESGStandardsRAG()
+                
+                # Query
+                result = rag.query(question)
+                
+                # Track cost (you'll need to add cost tracking to RAG)
+                # For now, estimate ~$0.02 per query
+                st.session_state.total_cost += 0.02
+                
+                # Display answer
+                st.success("Answer from ESG Standards:")
+                st.markdown(result['answer'])
+                
+                # Display sources
+                with st.expander("📖 Sources"):
+                    for source in set(result['sources']):
+                        st.caption(f"• {source}")
+                
+                st.info("💡 This answer was generated using RAG (Retrieval-Augmented Generation) over official GRI and SASB standards.")
+        else:
+            st.warning("Please enter a question first")
+            
 # Footer
 st.markdown("---")
 col1, col2, col3 = st.columns(3)

@@ -1,5 +1,6 @@
 """Calculate emissions from energy usage"""
 import json
+import datetime
 
 def load_epa_factors():
     """Load EPA emission factors from file"""
@@ -15,14 +16,14 @@ def load_epa_factors():
 
 def calculate_electricity_emissions(kwh, region="US_AVERAGE"):
     """
-    Calculate CO2 emissions from electricity usage
+    Calculate CO2 emissions from electricity usage with full audit trail
     
     Args:
         kwh: Kilowatt-hours used (must be >= 0)
         region: Region for emission factor (default US_AVERAGE)
         
     Returns:
-        dict: Emissions in kg CO2 and metric tons CO2
+        dict: Emissions in kg CO2 and metric tons CO2 with complete audit trail
     """
     # Validate input
     if kwh < 0:
@@ -45,12 +46,17 @@ def calculate_electricity_emissions(kwh, region="US_AVERAGE"):
     metric_tons_co2 = kg_co2 / 1000
     
     return {
-        "kwh": kwh,
-        "region": region,
-        "emission_factor_used": emission_factor,
-        "kg_co2": round(kg_co2, 2),
-        "metric_tons_co2": round(metric_tons_co2, 4)
-    }
+            "kwh": kwh,
+            "region": region,
+            "emission_factor_used": emission_factor,
+            "emission_factor_source": "EPA eGRID 2024",  
+            "emission_factor_unit": "kg CO2e per kWh",    
+            "gwp_source": "IPCC Fifth Assessment Report (AR5)",  
+            "calculation_method": f"{kwh} kWh × {emission_factor} kg CO2e/kWh", 
+            "kg_co2": round(kg_co2, 2),
+            "metric_tons_co2": round(metric_tons_co2, 4),
+            "calculation_timestamp": datetime.now().isoformat()  
+        }
 
 # Test it
 if __name__ == "__main__":

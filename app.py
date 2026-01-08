@@ -76,6 +76,10 @@ with tab1:
                 result = extract_and_calculate_emissions(bill_text, region=region)
                 
                 if result["success"]:
+                    # Update costs IMMEDIATELY (before any displays)
+                    st.session_state.total_cost += result['combined_cost']
+                    st.session_state.kwh = result['extraction']['total_kwh']
+                    
                     st.success("✅ Extraction successful!")
                     
                     # Show warnings if any
@@ -113,11 +117,7 @@ with tab1:
                             f"{result['emissions']['data']['emissions_mtco2e']}"
                         )
                     
-                    # Update session state
-                    st.session_state.total_cost += result['combined_cost']
-                    st.session_state.kwh = result['extraction']['total_kwh']
-                    
-                    # === NEW: Audit Trail Display ===
+                    # === Audit Trail Display ===
                     with st.expander("🔍 View Audit Trail & Verification"):
                         st.markdown("#### Extraction Details")
                         st.write(f"**Timestamp:** {result['extraction'].get('extraction_timestamp', 'N/A')}")
@@ -143,7 +143,6 @@ with tab1:
                         
                         st.markdown("#### Cost Tracking")
                         st.write(f"**API Cost (This Operation):** ${result['combined_cost']:.4f}")
-                    # === END AUDIT TRAIL ===
                     
                     # Show full details in expander (keep this for debugging)
                     with st.expander("View Full JSON Response"):
@@ -336,6 +335,9 @@ Format as bullet points, each with:
 
         from src.utils import call_claude_with_cost
         insights, cost = call_claude_with_cost(prompt)
+        
+        # Update session cost IMMEDIATELY
+        st.session_state.total_cost += cost['total_cost']
         
         st.markdown(insights)
         st.caption(f"Analysis cost: ${cost['total_cost']:.4f}")

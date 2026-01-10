@@ -6,6 +6,38 @@ from src.extract import extract_utility_bill_data, extract_and_calculate_emissio
 from src.calculate import calculate_electricity_emissions
 from src.categorize import categorize_to_scope
 
+# ============================================================================
+# DEMO DATA
+# ============================================================================
+
+DEMO_BILL_TEXT = """
+SOUTHWESTERN ELECTRIC POWER COMPANY
+Account #000-000-000-0-0
+
+SERVICE ADDRESS: 
+555 S George Washington Ln
+FAYETTEVILLE, AR 72701-5275
+
+Current bill summary:
+Billing from 11/05/25 - 12/05/25 (31 days)
+
+Usage: 282 kWh
+Current Charges: $46.84
+
+Line Item Charges:
+Rate Billing                        $ 19.52
+Customer Charge                       11.97
+Formula Rate Review Rider              3.61
+Cost of Fuel @ 0.0225120 Per kWh      6.35
+Municipal Franchise Adjustment         1.24
+Sales Tax                              4.15
+
+Current Balance Due                 $ 46.84
+Total Balance Due                   $ 46.84
+
+Amount due on or before January 2, 2026: $46.84
+"""
+
 # Page config (add at very top)
 st.set_page_config(
     page_title="ESG Automation System",
@@ -124,6 +156,9 @@ with tab1:
                     # Update costs IMMEDIATELY
                     st.session_state.total_cost += result['combined_cost']
                     st.session_state.kwh = result['extraction']['total_kwh']
+                    # Store for persistence
+                    st.session_state.last_extraction = result
+                    st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
                     
                     st.success("✅ AI extraction successful!")
                     
@@ -230,6 +265,9 @@ with tab1:
                         # Update costs IMMEDIATELY
                         st.session_state.total_cost += result['combined_cost']
                         st.session_state.kwh = result['extraction']['total_kwh']
+                        # Store for persistence
+                        st.session_state.last_extraction = result
+                        st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
                         
                         st.success("✅ Extraction successful!")
                         

@@ -159,6 +159,7 @@ with tab1:
                     # Store for persistence
                     st.session_state.last_extraction = result
                     st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
+                    st.session_state.extraction_region = region
                     
                     st.success("✅ AI extraction successful!")
                     
@@ -243,20 +244,21 @@ with tab1:
         col1, col2 = st.columns([3, 1])
         with col2:
             if st.button("📋 Try Demo Bill", help="Load example SWEPCO electric bill"):
-                st.session_state.demo_bill_loaded = True
+                st.session_state.demo_bill_text = DEMO_BILL_TEXT
         
-        # Text area with demo data if button clicked
+        # Text area with demo data if session has it
+        default_value = st.session_state.get('demo_bill_text', "")
+        
         bill_text = st.text_area(
             "Paste utility bill text:",
-            value=DEMO_BILL_TEXT if st.session_state.get('demo_bill_loaded', False) else "",
+            value=default_value,
             height=300,
             placeholder="Paste your utility bill text here..."
         )
         
-        # Clear demo flag after loading
-        if 'demo_bill_loaded' in st.session_state and st.session_state.demo_bill_loaded:
+        # Show success message if demo was just loaded
+        if default_value and default_value == DEMO_BILL_TEXT:
             st.success("✅ Demo bill loaded! Click 'Extract & Calculate' below.")
-            st.session_state.demo_bill_loaded = False
         
         region = st.selectbox(
             "Region (for emissions calculation):",
@@ -280,7 +282,8 @@ with tab1:
                         st.session_state.kwh = result['extraction']['total_kwh']
                         # Store for persistence
                         st.session_state.last_extraction = result
-                        st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
+                        st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Text extraction')
+                        st.session_state.extraction_region = region
                         
                         st.success("✅ Extraction successful!")
                         
@@ -368,10 +371,20 @@ with tab2:
         step=10.0
     )
     
+    # Use region from last extraction if available
+    default_region = st.session_state.get('extraction_region', 'US_AVERAGE')
+    region_options = ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS"]
+
+    # Find index of default region
+    try:
+        default_index = region_options.index(default_region)
+    except ValueError:
+        default_index = 0
+
     region = st.selectbox(
         "Region:",
-        ["US_AVERAGE", "ARKANSAS", "CALIFORNIA", "TEXAS", "NEW_YORK", "FLORIDA"],
-        key="calc_region"
+        region_options,
+        index=default_index
     )
     
     if st.button("Calculate Emissions", type="primary"):

@@ -55,7 +55,37 @@ st.sidebar.markdown("[GitHub](https://github.com/yourusername/esg-automation-sys
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Extract Data", "📊 Calculate Emissions", "🏷️ Categorize", "📚 ESG Standards", "📈 Operational Insights"])
 
 with tab1:
-    st.header("📄 Extract Utility Bill Data")
+    with tab1:
+        st.header("📄 Extract Utility Bill Data")
+        
+        # ===== SESSION PERSISTENCE: SHOW LAST EXTRACTION =====
+        if 'last_extraction' in st.session_state and st.session_state.last_extraction:
+            with st.expander("📋 Last Extraction Results (Persistent)", expanded=False):
+                result = st.session_state.last_extraction
+                
+                st.info(f"🔄 Method: {st.session_state.get('extraction_method', 'Unknown')}")
+                
+                # Display key metrics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Usage", f"{result['extraction']['total_kwh']:.0f} kWh")
+                with col2:
+                    st.metric("Cost", f"${result['extraction']['total_cost']:.2f}")
+                with col3:
+                    st.metric("Emissions", f"{result['emissions']['data']['emissions_mtco2e']} MT CO2e")
+                
+                # Show reporting period
+                start = result['extraction'].get('service_start_date', 'N/A')
+                end = result['extraction'].get('service_end_date', 'N/A')
+                st.caption(f"📅 Period: {start} to {end}")
+                
+                # Clear button
+                if st.button("🗑️ Clear Saved Results"):
+                    del st.session_state.last_extraction
+                    if 'extraction_method' in st.session_state:
+                        del st.session_state.extraction_method
+                    st.rerun()
+        # ===== END SESSION PERSISTENCE =====
     
     # Upload method selector
     upload_method = st.radio(

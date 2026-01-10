@@ -239,11 +239,24 @@ with tab1:
                             st.warning(w)
     
     else:  # Paste Text
+        # Demo button
+        col1, col2 = st.columns([3, 1])
+        with col2:
+            if st.button("📋 Try Demo Bill", help="Load example SWEPCO electric bill"):
+                st.session_state.demo_bill_loaded = True
+        
+        # Text area with demo data if button clicked
         bill_text = st.text_area(
             "Paste utility bill text:",
+            value=DEMO_BILL_TEXT if st.session_state.get('demo_bill_loaded', False) else "",
             height=300,
             placeholder="Paste your utility bill text here..."
         )
+        
+        # Clear demo flag after loading
+        if 'demo_bill_loaded' in st.session_state and st.session_state.demo_bill_loaded:
+            st.success("✅ Demo bill loaded! Click 'Extract & Calculate' below.")
+            st.session_state.demo_bill_loaded = False
         
         region = st.selectbox(
             "Region (for emissions calculation):",

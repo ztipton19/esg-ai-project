@@ -1,5 +1,6 @@
 # PDF files
 data/esg_standards/**/*.pdf
+data/test_bills
 
 # Personal notes
 notes/

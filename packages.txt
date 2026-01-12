@@ -1,7 +1,3 @@
-# System-level packages for Streamlit Cloud deployment
-# Required for Tesseract OCR (Tier 2 extraction)
 tesseract-ocr
 tesseract-ocr-eng
-
-# Required for pdf2image (converts PDFs to images for OCR)
 poppler-utils

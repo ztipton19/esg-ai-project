@@ -1,3 +1,6 @@
+# Secret files
+/.streamlit/secrets.toml
+
 # PDF files
 data/esg_standards/**/*.pdf
 data/test_bills

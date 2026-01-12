@@ -324,8 +324,8 @@ COMMON MISTAKES TO AVOID:
 def extract_from_pdf_with_ocr(pdf_file):
     """
     Extract utility bill data using Tesseract OCR
-    
-    Cost: ~$0.001 per PDF (essentially free, local processing)
+
+    Cost: $0 (runs locally, no API costs)
     Accuracy: 70-85% for scanned documents
     Speed: 3-5 seconds per PDF
     Use case: Scanned PDFs, image-based bills (Oklahoma EC type)
@@ -344,7 +344,13 @@ def extract_from_pdf_with_ocr(pdf_file):
         from PIL import Image
         import tempfile
         import os
-        
+
+        # Configure Tesseract path for Windows (if not in PATH)
+        if os.name == 'nt':  # Windows
+            tesseract_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            if os.path.exists(tesseract_path):
+                pytesseract.pytesseract.tesseract_cmd = tesseract_path
+
         print("\n📸 Starting OCR extraction (Tesseract)...")
         
         # Read PDF bytes
@@ -400,7 +406,7 @@ def extract_from_pdf_with_ocr(pdf_file):
             "confidence": confidence,
             "validation_issues": issues if not is_valid else None,
             "method": "OCR (Tesseract)",
-            "cost": 0.001,  # Essentially free, but track nominal cost
+            "cost": 0.0,  # Free - runs locally, no API costs
             "processing_time": round(elapsed_time, 2),
             "ocr_text_length": len(full_text),
             "raw_text": full_text[:1000]  # First 1000 chars for debugging
@@ -427,8 +433,8 @@ def extract_from_pdf_with_ocr(pdf_file):
 def extract_from_pdf_with_docling(pdf_file):
     """
     Extract utility bill data using Docling (IBM's document AI)
-    
-    Cost: ~$0.0001 per PDF (200x cheaper than Claude API)
+
+    Cost: $0 (runs locally, no API costs)
     Accuracy: 85-90% for standard utility bills
     Speed: 2-3 seconds per PDF
     
@@ -495,7 +501,7 @@ def extract_from_pdf_with_docling(pdf_file):
             "confidence": confidence,
             "validation_issues": issues if not is_valid else None,
             "method": "Docling (local)",
-            "cost": 0.0001,
+            "cost": 0.0,  # Free - runs locally, no API costs
             "processing_time": round(elapsed_time, 2),
             "raw_text": text[:1000]  # First 1000 chars for debugging
         }
@@ -805,9 +811,9 @@ def extract_bill_data(pdf_file, confidence_threshold=0.85, enable_ocr=True, enab
     TIER 3: Claude Vision API (expensive, complex layouts)
     
     Cost optimization:
-    - 85% of bills: $0.0001 (Docling)
-    - 10% of bills: $0.001  (OCR)
-    - 5% of bills:  $0.02   (Claude)
+    - 85% of bills: $0 (Docling - local)
+    - 10% of bills: $0 (OCR - local)
+    - 5% of bills:  ~$0.01-0.02 (Claude API)
     
     Args:
         pdf_file: Streamlit UploadedFile object

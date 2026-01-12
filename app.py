@@ -2,6 +2,7 @@
 """ESG Automation System - Streamlit Interface"""
 import streamlit as st
 import json
+import datetime
 from src.extract import extract_utility_bill_data, extract_and_calculate_emissions
 from src.calculate import calculate_electricity_emissions
 from src.categorize import categorize_to_scope
@@ -66,7 +67,7 @@ if st.sidebar.button("Reset Costs"):
     st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📊 Project Metrics")
+st.sidebar.markdown("### 📊 Project Metrics - Example Text")
 st.sidebar.metric("Reports Generated", "12")
 st.sidebar.metric("Avg Time Saved", "70%")
 st.sidebar.metric("Avg Cost/Report", "$0.08")
@@ -74,16 +75,34 @@ st.sidebar.metric("Avg Cost/Report", "$0.08")
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ℹ️ About")
 st.sidebar.markdown("""
-This system automates ESG compliance reporting by:
-- Extracting data from utility bills (Docling + Claude API)
-- Calculating emissions (EPA factors)
-- Categorizing to GRI/SASB standards
-- Generating compliance reports
-- Identifying cost-saving opportunities
+**3-Tier Extraction System:**
+
+🚀 **Tier 1: Docling** (Local)
+- Text-based PDFs
+- $0 (runs locally)
+
+🔬 **Tier 2: OCR** (Tesseract)
+- Scanned/Image PDFs
+- $0 (runs locally)
+
+🤖 **Tier 3: Claude Vision** (API)
+- Complex layouts
+- ~$0.01-0.02 per bill
+
+**Cost Savings:** 95%+ vs Claude-only
 """)
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Built with:** Docling + Claude API + Streamlit")
+st.sidebar.markdown("**Features:**")
+st.sidebar.markdown("""
+- Automatic tier selection
+- Meter reading calculation
+- Data validation
+- Audit trail tracking
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("**Built with:** Docling + OCR + Claude API")
 
 # ============================================================================
 # TABS
@@ -128,6 +147,10 @@ with tab1:
                 del st.session_state.last_extraction
                 if 'extraction_method' in st.session_state:
                     del st.session_state.extraction_method
+                if 'last_report' in st.session_state:
+                    del st.session_state.last_report
+                if 'generating_report' in st.session_state:
+                    del st.session_state.generating_report
                 st.rerun()
     
     # ===== INPUT METHOD SELECTOR =====
@@ -139,12 +162,13 @@ with tab1:
     
     # ===== PDF UPLOAD MODE =====
     if upload_method == "📎 Upload PDF":
-        st.info("💡 **Hybrid Extraction:** Docling tries first (free), Claude API as fallback")
+        st.info("💡 **3-Tier Extraction:** Docling (free) → OCR (free) → Claude Vision (~$0.01-0.02)")
         
-        uploaded_file = st.file_uploader(
-            "Upload utility bill PDF:",
+        uploaded_files = st.file_uploader(
+            "Upload utility bill PDF(s):",
             type=['pdf'],
-            help="Docling will extract data locally (free), Claude API for complex cases"
+            accept_multiple_files=True,
+            help="Upload multiple bills for batch processing"
         )
         
         region = st.selectbox(
@@ -154,13 +178,193 @@ with tab1:
             key="pdf_region"
         )
         
-        if uploaded_file is not None and st.button("🤖 Extract from PDF", type="primary"):
-            with st.spinner("🔍 Processing PDF with Docling..."):
-                from src.extract import extract_from_pdf_hybrid
-                from src.calculate import calculate_electricity_emissions
+        # Determine if batch mode
+        is_batch = uploaded_files and len(uploaded_files) > 1
+        
+        if is_batch:
+            st.success(f"📊 **Batch Mode:** {len(uploaded_files)} bills uploaded")
+        
+        if uploaded_files and st.button(
+            f"🤖 Process {'All Bills' if is_batch else 'PDF'}",
+            type="primary"
+        ):
+            # Clear old report when starting new extraction
+            if 'last_report' in st.session_state:
+                del st.session_state.last_report
+            if 'generating_report' in st.session_state:
+                del st.session_state.generating_report
+
+            from src.extract import extract_from_pdf_hybrid
+            from src.calculate import calculate_electricity_emissions
+
+            if is_batch:
+                # ===== BATCH PROCESSING MODE =====
+                st.markdown("---")
+                st.subheader("📊 Batch Processing Results")
                 
-                # Hybrid extraction (Docling → Claude fallback)
-                extracted = extract_from_pdf_hybrid(uploaded_file)
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                results = []
+                tier_counts = {"Tier 1 (Docling)": 0, "Tier 2 (OCR)": 0, "Tier 3 (Claude Vision)": 0}
+                total_cost = 0
+                
+                for idx, uploaded_file in enumerate(uploaded_files):
+                    status_text.text(f"Processing {idx + 1}/{len(uploaded_files)}: {uploaded_file.name}")
+                    
+                    # Extract from PDF
+                    extracted = extract_from_pdf_hybrid(uploaded_file, confidence_threshold=0.70)
+                    
+                    if extracted:
+                        # Calculate emissions
+                        start = extracted.get("service_start_date", "Unknown")
+                        end = extracted.get("service_end_date", "Unknown")
+                        reporting_period = f"{start} to {end}"
+                        
+                        emissions_result = calculate_electricity_emissions(
+                            kwh=extracted.get("total_kwh", 0),
+                            region=region,
+                            reporting_period=reporting_period
+                        )
+                        
+                        result = {
+                            "success": True,
+                            "filename": uploaded_file.name,
+                            "extraction": extracted,
+                            "emissions": emissions_result,
+                            "cost": extracted.get("extraction_cost", 0)
+                        }
+                        
+                        # Track tier usage
+                        method = extracted.get("extraction_method", "")
+                        if "Docling" in method:
+                            tier_counts["Tier 1 (Docling)"] += 1
+                        elif "OCR" in method:
+                            tier_counts["Tier 2 (OCR)"] += 1
+                        elif "Claude" in method or "Vision" in method:
+                            tier_counts["Tier 3 (Claude Vision)"] += 1
+                        
+                        total_cost += result['cost']
+                        results.append(result)
+                    else:
+                        results.append({
+                            "success": False,
+                            "filename": uploaded_file.name,
+                            "error": "Extraction failed"
+                        })
+                    
+                    progress_bar.progress((idx + 1) / len(uploaded_files))
+                
+                status_text.empty()
+                progress_bar.empty()
+
+                # Update session state
+                st.session_state.total_cost += total_cost
+
+                # Store aggregate data for Tab 2 and Report Generation
+                successful_results = [r for r in results if r['success']]
+                if successful_results:
+                    total_kwh = sum(r['extraction']['total_kwh'] for r in successful_results)
+                    total_emissions = sum(r['emissions']['data']['emissions_mtco2e'] for r in successful_results)
+                    total_bill_cost = sum(r['extraction'].get('total_cost', 0) for r in successful_results if r['extraction'].get('total_cost'))
+
+                    # CRITICAL: Store in same format as single-file mode for report generation
+                    st.session_state.last_extraction = {
+                        "success": True,
+                        "extraction": {
+                            "total_kwh": total_kwh,
+                            "total_cost": total_bill_cost,
+                            "service_start_date": successful_results[0]['extraction'].get('service_start_date', 'N/A'),
+                            "service_end_date": successful_results[-1]['extraction'].get('service_end_date', 'N/A'),
+                            "extraction_method": f"Batch Processing ({len(successful_results)} bills)"
+                        },
+                        "emissions": {
+                            "data": {
+                                "emissions_mtco2e": total_emissions,
+                                "emissions_kg_co2e": total_emissions * 1000
+                            },
+                            "audit": successful_results[0]['emissions']['audit']  # Use first as template
+                        },
+                        "combined_cost": total_cost
+                    }
+                    st.session_state.kwh = total_kwh
+                    st.session_state.extraction_method = "Batch Processing"
+                    st.session_state.extraction_region = region
+
+                # ===== DISPLAY BATCH RESULTS =====
+                st.success(f"✅ Processed {len([r for r in results if r['success']])} of {len(uploaded_files)} bills")
+                
+                # Tier breakdown
+                st.markdown("### 📊 3-Tier Cost Optimization")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Tier 1 (Docling)", f"{tier_counts['Tier 1 (Docling)']} bills", "$0 (local)")
+                with col2:
+                    st.metric("Tier 2 (OCR)", f"{tier_counts['Tier 2 (OCR)']} bills", "$0 (local)")
+                with col3:
+                    st.metric("Tier 3 (Claude)", f"{tier_counts['Tier 3 (Claude Vision)']} bills", "~$0.01-0.02 each")
+                
+                # Cost comparison
+                claude_only_cost = len(uploaded_files) * 0.02
+                savings = claude_only_cost - total_cost
+                savings_pct = (savings / claude_only_cost * 100) if claude_only_cost > 0 else 0
+                
+                st.markdown("### 💰 Cost Analysis")
+                col4, col5, col6 = st.columns(3)
+                with col4:
+                    st.metric("Actual Cost", f"${total_cost:.4f}")
+                with col5:
+                    st.metric("Claude-Only Cost", f"${claude_only_cost:.4f}")
+                with col6:
+                    st.metric("Savings", f"${savings:.4f}", f"{savings_pct:.1f}%")
+                
+                # Aggregate emissions
+                successful_results = [r for r in results if r['success']]
+                if successful_results:
+                    st.markdown("### 🌍 Aggregate Emissions")
+                    
+                    total_kwh = sum(r['extraction']['total_kwh'] for r in successful_results)
+                    total_emissions = sum(r['emissions']['data']['emissions_mtco2e'] for r in successful_results)
+                    total_bill_cost = sum(r['extraction'].get('total_cost', 0) for r in successful_results if r['extraction'].get('total_cost'))
+                    
+                    col7, col8, col9 = st.columns(3)
+                    with col7:
+                        st.metric("Total Usage", f"{total_kwh:,.0f} kWh")
+                    with col8:
+                        st.metric("Total Emissions", f"{total_emissions:.4f} MT CO2e")
+                    with col9:
+                        st.metric("Total Cost", f"${total_bill_cost:,.2f}")
+                
+                # Individual results table
+                with st.expander("📋 Individual Bill Results", expanded=False):
+                    for result in results:
+                        if result['success']:
+                            st.markdown(f"**{result['filename']}**")
+                            col_a, col_b, col_c, col_d = st.columns(4)
+                            with col_a:
+                                st.caption(f"Usage: {result['extraction']['total_kwh']:.0f} kWh")
+                            with col_b:
+                                st.caption(f"Emissions: {result['emissions']['data']['emissions_mtco2e']} MT")
+                            with col_c:
+                                st.caption(f"Method: {result['extraction'].get('extraction_method', 'N/A')}")
+                            with col_d:
+                                st.caption(f"Cost: ${result['cost']:.4f}")
+                            st.markdown("---")
+                        else:
+                            st.error(f"❌ {result['filename']}: {result.get('error', 'Unknown error')}")
+
+                # Force rerun to show the report button immediately
+                if successful_results and 'last_extraction' in st.session_state:
+                    st.rerun()
+
+            else:
+                # ===== SINGLE FILE MODE (original code) =====
+                uploaded_file = uploaded_files[0]
+                
+                with st.spinner("🔍 Processing PDF with 3-tier extraction..."):
+                    # Hybrid extraction (Docling → OCR → Claude fallback)
+                    extracted = extract_from_pdf_hybrid(uploaded_file, confidence_threshold=0.70)
                 
                 if extracted:
                     # Calculate emissions
@@ -195,39 +399,37 @@ with tab1:
                     st.session_state.last_extraction = result
                     st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
                     st.session_state.extraction_region = region
-                    
+
                     st.success("✅ Extraction successful!")
-                    
+
                     # Show method with cost
                     method = result['extraction'].get('extraction_method', 'Unknown')
                     cost = result['combined_cost']
-                    
+
                     if "Docling" in method:
-                        st.info(f"💰 **Cost Savings!** Extracted locally with Docling (~$0.0001)")
+                        st.info(f"💰 **Cost Savings!** Extracted locally with Docling ($0)")
+                        st.caption(f"📄 {method}")
+                    elif "OCR" in method:
+                        st.info(f"💰 **Cost Savings!** Extracted locally with OCR ($0)")
                         st.caption(f"📄 {method}")
                     elif "Claude" in method:
                         st.info(f"🤖 Extracted with Claude API (~${cost:.4f})")
                         st.caption(f"📄 {method}")
-                    
+
                     # Warnings
                     if result["warnings"]:
                         for warning in result["warnings"]:
                             st.warning(warning)
-                    
+
                     # Extracted data
                     col1, col2 = st.columns(2)
                     with col1:
                         st.metric("Usage", f"{result['extraction']['total_kwh']:.0f} kWh")
                         st.caption(result['extraction'].get('unit_conversion_applied', 'No conversion'))
                     with col2:
-                        total_cost = result['extraction'].get('total_cost')
-                        if total_cost is not None:
-                            st.metric("Cost", f"${total_cost:.2f}")
-                            st.caption(f"Rate: ${result['extraction'].get('calculated_rate_per_kwh', 0):.3f}/kWh")
-                        else:
-                            st.metric("Cost", "Not found")
-                            st.caption("Could not extract cost from bill")
-                    
+                        st.metric("Cost", f"${result['extraction']['total_cost']:.2f}")
+                        st.caption(f"Rate: ${result['extraction'].get('calculated_rate_per_kwh', 0):.3f}/kWh")
+
                     # Emissions
                     st.subheader("📊 Calculated Emissions")
                     col3, col4 = st.columns(2)
@@ -235,25 +437,25 @@ with tab1:
                         st.metric("CO2 Emissions", f"{result['emissions']['data']['emissions_kg_co2e']} kg")
                     with col4:
                         st.metric("Metric Tons CO2e", f"{result['emissions']['data']['emissions_mtco2e']}")
-                    
+
                     # Audit Trail
                     with st.expander("🔍 View Audit Trail & Verification"):
                         st.markdown("#### Extraction Details")
                         st.write(f"**Timestamp:** {result['extraction'].get('extraction_timestamp', 'N/A')}")
                         st.write(f"**Method:** {result['extraction'].get('extraction_method', 'N/A')}")
                         st.write(f"**Validation:** {'✅ Passed' if result['extraction'].get('validation_passed') else '⚠️ Warnings'}")
-                        
+
                         st.markdown("#### Emissions Calculation")
                         audit = result['emissions']['audit']
                         st.write(f"**Formula:** `{audit['calculation_formula']}`")
                         st.write(f"**Emission Factor:** {audit['emission_factor']} {audit['emission_factor_unit']}")
                         st.write(f"**Source:** {audit['emission_factor_source']}")
-                        
+
                         st.markdown("#### Cost Tracking")
                         st.write(f"**API Cost:** ${result['combined_cost']:.4f}")
                         if "Docling" in method:
                             st.caption("💡 Docling processed locally - essentially free!")
-                    
+
                     with st.expander("🔧 View Full JSON (Debug)"):
                         st.json(result)
                 else:
@@ -286,8 +488,14 @@ with tab1:
         )
         
         has_bill_text = bill_text and len(bill_text.strip()) > 0
-        
+
         if st.button("Extract & Calculate", type="primary", disabled=not has_bill_text):
+            # Clear old report when starting new extraction
+            if 'last_report' in st.session_state:
+                del st.session_state.last_report
+            if 'generating_report' in st.session_state:
+                del st.session_state.generating_report
+
             if bill_text:
                 with st.spinner("🔍 Processing bill..."):
                     result = extract_and_calculate_emissions(bill_text=bill_text, region=region)
@@ -313,13 +521,8 @@ with tab1:
                             st.metric("Usage", f"{result['extraction']['total_kwh']:.0f} kWh")
                             st.caption(result['extraction'].get('unit_conversion_applied', 'No conversion'))
                         with col2:
-                            total_cost = result['extraction'].get('total_cost')
-                            if total_cost is not None:
-                                st.metric("Cost", f"${total_cost:.2f}")
-                                st.caption(f"Rate: ${result['extraction'].get('calculated_rate_per_kwh', 0):.3f}/kWh")
-                            else:
-                                st.metric("Cost", "Not found")
-                                st.caption("Could not extract cost from bill")
+                            st.metric("Cost", f"${result['extraction']['total_cost']:.2f}")
+                            st.caption(f"Rate: ${result['extraction'].get('calculated_rate_per_kwh', 0):.3f}/kWh")
                         
                         # Emissions
                         st.subheader("📊 Calculated Emissions")
@@ -347,6 +550,137 @@ with tab1:
                             st.json(result)
                     else:
                         st.error(f"❌ {result['error']}")
+
+    # ===== PERSISTENT REPORT GENERATION SECTION =====
+    # This section appears whenever there's a last_extraction in session state
+    # It's outside the button blocks so it persists across reruns
+    if 'last_extraction' in st.session_state and st.session_state.last_extraction:
+        st.markdown("---")
+        st.subheader("📄 Generate Compliance Report")
+
+        col1, col2 = st.columns([2, 3])
+        with col1:
+            if st.button("🚀 Generate GRI 305-2 Report", type="primary", key="gen_report_persistent", use_container_width=True):
+                st.session_state.generating_report = True
+        with col2:
+            st.info("Generate a GRI 305-2 compliant emissions report from your extracted data.")
+
+        # Report generation logic (triggered by button above)
+        if st.session_state.get('generating_report', False):
+            with st.spinner("Generating compliance report..."):
+                from src.reports import generate_gri_report_section
+
+                result = st.session_state.last_extraction
+                region = st.session_state.get('extraction_region', 'US_AVERAGE')
+
+                # Prepare emissions data for report
+                emissions_for_report = {
+                    "reporting_period": f"{result['extraction'].get('service_start_date', 'N/A')} to {result['extraction'].get('service_end_date', 'N/A')}",
+                    "service_start_date": result['extraction'].get('service_start_date'),
+                    "service_end_date": result['extraction'].get('service_end_date'),
+                    "total_kwh": result['extraction']['total_kwh'],
+                    "region": region,
+                    "metric_tons_co2": result['emissions']['data']['emissions_mtco2e'],
+                    "emission_factor_used": result['emissions']['audit']['emission_factor'],
+                    "emission_factor_source": result['emissions']['audit']['emission_factor_source'],
+                    "emission_factor_unit": result['emissions']['audit']['emission_factor_unit'],
+                    "gwp_source": "IPCC AR5",
+                    "calculation_method": result['emissions']['audit']['calculation_formula']
+                }
+
+                # Generate report
+                report = generate_gri_report_section(emissions_for_report, scope="Scope 2")
+
+                if report['validation_passed']:
+                    st.session_state.total_cost += report['cost']
+                    st.session_state.last_report = report
+                    st.session_state.generating_report = False
+
+                    st.success("✅ Report generated and validated!")
+
+                    with st.expander("📄 GRI 305-2 Compliance Report", expanded=True):
+                        st.markdown(report['report_text'])
+
+                        st.markdown("---")
+                        st.caption(f"💰 Report generation cost: ${report['cost']:.4f}")
+                        st.caption(f"✅ Validation: Passed")
+
+                        # Generate PDF
+                        from src.pdf_generator import generate_gri_pdf, create_pdf_filename
+
+                        # Use today's date for the filename
+                        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+                        pdf_filename = f"GRI_Compliance_Report_{today_str}.pdf"
+
+                        # Generate the PDF using the new filename
+                        pdf_buffer = generate_gri_pdf(report['report_text'], pdf_filename)
+
+                        # Download buttons - both PDF and Text
+                        col_pdf, col_txt = st.columns(2)
+                        with col_pdf:
+                            st.download_button(
+                                label="📥 Download PDF Report",
+                                data=pdf_buffer,
+                                file_name=pdf_filename,
+                                mime="application/pdf",
+                                key="download_pdf_persistent",
+                                type="primary"
+                            )
+                        with col_txt:
+                            st.download_button(
+                                label="📄 Download Text Version",
+                                data=report['report_text'],
+                                file_name=pdf_filename.replace('.pdf', '.txt'),
+                                mime="text/plain",
+                                key="download_txt_persistent"
+                            )
+                else:
+                    st.session_state.generating_report = False
+                    st.error("⚠️ Report validation failed")
+                    for warning in report['warnings']:
+                        st.warning(warning)
+
+        # Display previously generated report if it exists
+        elif 'last_report' in st.session_state and st.session_state.last_report:
+            report = st.session_state.last_report
+            result = st.session_state.last_extraction
+
+            with st.expander("📄 Previously Generated Report", expanded=False):
+                st.markdown(report['report_text'])
+
+                st.markdown("---")
+                st.caption(f"💰 Report generation cost: ${report['cost']:.4f}")
+                st.caption(f"✅ Validation: Passed")
+
+                # Generate PDF
+                from src.pdf_generator import generate_gri_pdf, create_pdf_filename
+
+                # Use today's date for the filename
+                today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+                pdf_filename = f"GRI_Compliance_Report_{today_str}.pdf"
+
+                # Generate the PDF using the new filename
+                pdf_buffer = generate_gri_pdf(report['report_text'], pdf_filename)
+
+                # Download buttons - both PDF and Text
+                col_pdf, col_txt = st.columns(2)
+                with col_pdf:
+                    st.download_button(
+                        label="📥 Download PDF Report",
+                        data=pdf_buffer,
+                        file_name=pdf_filename,
+                        mime="application/pdf",
+                        key="download_pdf_previous",
+                        type="primary"
+                    )
+                with col_txt:
+                    st.download_button(
+                        label="📄 Download Text Version",
+                        data=report['report_text'],
+                        file_name=pdf_filename.replace('.pdf', '.txt'),
+                        mime="text/plain",
+                        key="download_txt_previous"
+                    )
 
 # ============================================================================
 # TAB 2: CALCULATE EMISSIONS
@@ -464,7 +798,7 @@ with tab4:
 # ============================================================================
 
 with tab5:
-    st.header("📈 Operational Insights")
+    st.header("📈 Operational Insights - Example Text")
     
     monthly_data = {
         "November": {"kwh": 920, "cost": 138.50, "co2_kg": 673},

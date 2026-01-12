@@ -2,14 +2,14 @@
 Extract data from utility bills using production-grade 3-tier strategy
 
 EXTRACTION STRATEGY:
-- Tier 1: Docling (free, text PDFs) - 85% of bills - $0.0001/bill
-- Tier 2: Tesseract OCR (scanned PDFs) - 10% of bills - $0.001/bill
-- Tier 3: Claude Vision API (complex layouts) - 5% of bills - $0.02/bill
+- Tier 1: Docling (local processing) - 85% of bills - $0/bill
+- Tier 2: Tesseract OCR (local processing) - 10% of bills - $0/bill
+- Tier 3: Claude Vision API (cloud API) - 5% of bills - ~$0.01-0.02/bill
 
 COST OPTIMIZATION:
-- 3-tier approach: $1.19/month for 1000 bills
-- Claude-only approach: $20.00/month for 1000 bills
-- Savings: 94% ($225.78/year for 12,000 bills)
+- 3-tier approach: ~$0.50-1.00/month for 1000 bills (only pays for 5% using Claude)
+- Claude-only approach: $10-20/month for 1000 bills
+- Savings: 95%+ (free local processing for 95% of bills)
 
 KEY FEATURES:
 - Automatic tier selection based on confidence
@@ -93,8 +93,8 @@ def extract_from_pdf_hybrid(pdf_file, confidence_threshold=0.85, enable_ocr=True
     - Tier 3: Claude API (expensive, complex layouts) - 5% of bills
     
     Cost comparison (per 1000 bills):
-    - 3-tier: $1.19/month (94% savings vs Claude-only)
-    - Claude-only: $20.00/month
+    - 3-tier: ~$0.50-1.00/month (95%+ savings - only pays for ~5% using Claude API)
+    - Claude-only: $10-20/month
     
     Args:
         pdf_file: Streamlit UploadedFile object
@@ -355,8 +355,8 @@ if __name__ == "__main__":
     print("="*70)
     print("\n💡 EXTRACTION STRATEGY:")
     print("   Tier 1: Docling (free) → Text-based PDFs")
-    print("   Tier 2: OCR ($0.001) → Scanned/Image PDFs")
-    print("   Tier 3: Claude ($0.02) → Complex layouts")
+    print("   Tier 2: OCR (free) → Scanned/Image PDFs")
+    print("   Tier 3: Claude (~$0.01-0.02) → Complex layouts")
     print("="*70)
     
     # Test Case 1: Standard kWh bill (text)
@@ -427,15 +427,15 @@ if __name__ == "__main__":
     print("\n[COST ANALYSIS] 3-Tier vs Claude-Only")
     print("-"*70)
     print("Processing 1,000 bills/month:")
-    print("   850 text PDFs (Tier 1): $0.09")
-    print("   100 scanned PDFs (Tier 2): $0.10")
-    print("   50 complex layouts (Tier 3): $1.00")
+    print("   850 text PDFs (Tier 1): $0 (local)")
+    print("   100 scanned PDFs (Tier 2): $0 (local)")
+    print("   50 complex layouts (Tier 3): ~$0.50-1.00 (Claude API)")
     print("   " + "-"*40)
-    print("   3-tier total: $1.19/month")
-    print("   Claude-only: $20.00/month")
-    print("   💰 Savings: $18.82/month (94%)")
-    print("\nAnnual savings: $225.78/year")
-    print("5-year ROI: $1,128.90")
+    print("   3-tier total: ~$0.50-1.00/month")
+    print("   Claude-only: $10-20/month")
+    print("   💰 Savings: ~$9.50-19/month (95%+)")
+    print("\nAnnual savings: $114-228/year")
+    print("5-year ROI: $570-1,140")
     
     print("\n" + "="*70)
     print("📊 FOR PDF TESTING:")

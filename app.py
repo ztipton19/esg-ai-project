@@ -136,7 +136,29 @@ st.markdown("""
         border-radius: 0.5rem;
         font-weight: 500;
     }
-    
+
+    /* Sidebar Button Styling - Fix inverted states */
+    [data-testid="stSidebar"] .stButton > button {
+        background-color: #334155 !important;
+        color: #94a3b8 !important;
+        border: 1px solid #475569 !important;
+        transition: all 0.2s ease !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background-color: #475569 !important;
+        color: #e2e8f0 !important;
+        border-color: #64748b !important;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
+    }
+    [data-testid="stSidebar"] .stButton > button:active,
+    [data-testid="stSidebar"] .stButton > button:focus {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #10b981 !important;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3) !important;
+    }
+
     /* Tab Styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;

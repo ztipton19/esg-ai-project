@@ -948,7 +948,8 @@ with tab5:
     st.subheader("Cost-Saving Opportunities")
     
     if st.button("Generate Insights"):
-        prompt = """Analyze this energy usage data and provide 3 specific cost-saving recommendations:
+        with st.spinner("Analyzing energy usage and generating recommendations..."):
+            prompt = """Analyze this energy usage data and provide 3 specific cost-saving recommendations:
 
 Current Month: 850 kWh, $127.50, 622 kg CO2
 Previous Month: 920 kWh, $138.50, 673 kg CO2
@@ -956,11 +957,12 @@ Region: Arkansas
 
 Format as bullet points, each with recommendation, estimated savings, and implementation difficulty."""
 
-        from src.utils import call_claude_with_cost
-        insights, cost = call_claude_with_cost(prompt)
+            from src.utils import call_claude_with_cost
+            insights, cost = call_claude_with_cost(prompt)
+            
+            st.session_state.total_cost += cost['total_cost']
         
-        st.session_state.total_cost += cost['total_cost']
-        
+        st.success("Analysis complete!")
         st.markdown(insights)
         st.caption(f"Analysis cost: ${cost['total_cost']:.4f}")
 

@@ -193,29 +193,37 @@ if 'cost_transactions' not in st.session_state:
 
 # Derive total cost from transactions (reactive state)
 total_api_cost = sum(t['amount'] for t in st.session_state.cost_transactions)
+transaction_count = len(st.session_state.cost_transactions)
+
+# Use transaction count as key to force re-render when it changes
+cost_display_key = f"cost_display_{transaction_count}"
 
 # Display with visual feedback animation
 st.sidebar.markdown(f"""
-<div style="
+<div key="{cost_display_key}" style="
     padding: 1rem;
     background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
     border-radius: 0.5rem;
     border: 2px solid #10b981;
-    animation: pulse 0.5s ease-in-out;
+    animation: costUpdate 0.5s ease-in-out;
 ">
     <div style="color: #6ee7b7; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;">TOTAL API COST</div>
     <div style="color: #ffffff; font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', monospace; margin-top: 0.25rem;">
         ${total_api_cost:.4f}
     </div>
     <div style="color: #a7f3d0; font-size: 0.7rem; margin-top: 0.25rem;">
-        {len(st.session_state.cost_transactions)} transactions
+        {transaction_count} transactions
+    </div>
+    <div style="color: #6ee7b7; font-size: 0.65rem; margin-top: 0.5rem; font-style: italic;">
+        💡 Updates after each operation
     </div>
 </div>
 
 <style>
-@keyframes pulse {{
-    0%, 100% {{ transform: scale(1); }}
-    50% {{ transform: scale(1.02); box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }}
+@keyframes costUpdate {{
+    0% {{ transform: scale(1); opacity: 0.8; }}
+    50% {{ transform: scale(1.05); box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); opacity: 1; }}
+    100% {{ transform: scale(1); opacity: 1; }}
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -635,12 +643,16 @@ with tab1:
                             description=f"PDF extraction: {uploaded_file.name}",
                             operation_type="extraction_single"
                         )
+                        # Show immediate cost feedback
+                        current_total = sum(t['amount'] for t in st.session_state.cost_transactions)
+                        st.success(f"✅ Extraction successful! | Cost: ${result['combined_cost']:.4f} | Session Total: ${current_total:.4f}")
+                    else:
+                        st.success("✅ Extraction successful! (Free - processed locally)")
+
                     st.session_state.kwh = result['extraction']['total_kwh']
                     st.session_state.last_extraction = result
                     st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
                     st.session_state.extraction_region = region
-
-                    st.success("Extraction successful!")
 
                     # Show method with cost
                     method = result['extraction'].get('extraction_method', 'Unknown')
@@ -851,7 +863,9 @@ with tab1:
                     st.session_state.last_report = report
                     st.session_state.generating_report = False
 
-                    st.success("✅ Report generated and validated!")
+                    # Show immediate cost feedback
+                    current_total = sum(t['amount'] for t in st.session_state.cost_transactions)
+                    st.success(f"✅ Report generated and validated! | Cost: ${report['cost']:.4f} | Session Total: ${current_total:.4f}")
 
                     with st.expander("📄 GRI 305-2 Compliance Report", expanded=True):
                         st.markdown(report['report_text'])

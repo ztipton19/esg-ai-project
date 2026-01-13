@@ -164,14 +164,77 @@ st.caption("Automated compliance reporting with intelligent 3-tier extraction")
 # ============================================================================
 
 st.sidebar.markdown("### Session Costs")
-if 'total_cost' not in st.session_state:
-    st.session_state.total_cost = 0.0
 
-st.sidebar.metric("Total API Cost", f"${st.session_state.total_cost:.4f}")
+# Initialize transactional state model
+if 'cost_transactions' not in st.session_state:
+    st.session_state.cost_transactions = []
 
-if st.sidebar.button("Reset Costs"):
-    st.session_state.total_cost = 0.0
-    st.rerun()
+# Derive total cost from transactions (reactive state)
+total_api_cost = sum(t['amount'] for t in st.session_state.cost_transactions)
+
+# Display with visual feedback animation
+st.sidebar.markdown(f"""
+<div style="
+    padding: 1rem;
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    border-radius: 0.5rem;
+    border: 2px solid #10b981;
+    animation: pulse 0.5s ease-in-out;
+">
+    <div style="color: #6ee7b7; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;">TOTAL API COST</div>
+    <div style="color: #ffffff; font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', monospace; margin-top: 0.25rem;">
+        ${total_api_cost:.4f}
+    </div>
+    <div style="color: #a7f3d0; font-size: 0.7rem; margin-top: 0.25rem;">
+        {len(st.session_state.cost_transactions)} transactions
+    </div>
+</div>
+
+<style>
+@keyframes pulse {{
+    0%, 100% {{ transform: scale(1); }}
+    50% {{ transform: scale(1.02); box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }}
+}}
+</style>
+""", unsafe_allow_html=True)
+
+col_reset, col_view = st.sidebar.columns(2)
+with col_reset:
+    if st.button("Reset", use_container_width=True):
+        st.session_state.cost_transactions = []
+        st.rerun()
+
+with col_view:
+    if st.button("View Audit", use_container_width=True):
+        st.session_state.show_cost_audit = not st.session_state.get('show_cost_audit', False)
+
+# Show transaction audit trail
+if st.session_state.get('show_cost_audit', False) and st.session_state.cost_transactions:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown('<h4 style="color: #e2e8f0;">Transaction Audit Trail</h4>', unsafe_allow_html=True)
+
+    with st.sidebar.expander("Recent Transactions", expanded=True):
+        # Show last 5 transactions
+        for transaction in reversed(st.session_state.cost_transactions[-5:]):
+            st.markdown(f"""
+            <div style="
+                background: #1e293b;
+                padding: 0.5rem;
+                border-radius: 0.375rem;
+                margin-bottom: 0.5rem;
+                border-left: 3px solid #10b981;
+            ">
+                <div style="color: #10b981; font-size: 0.9rem; font-weight: 600;">
+                    ${transaction['amount']:.4f}
+                </div>
+                <div style="color: #94a3b8; font-size: 0.75rem;">
+                    {transaction['description']}
+                </div>
+                <div style="color: #64748b; font-size: 0.65rem; margin-top: 0.25rem;">
+                    {transaction['type']} • {transaction['timestamp'].split('T')[1][:8]}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown('<h3 style="color: #e2e8f0;">Project Metrics <span style="font-size:0.7em; color:#64748b;">(Example Data)</span></h3>', unsafe_allow_html=True)
@@ -220,6 +283,30 @@ st.sidebar.markdown("""
 
 st.sidebar.markdown("---")
 st.sidebar.markdown('<span style="color: #94a3b8;"><strong>Built with:</strong> Docling + OCR + Claude API</span>', unsafe_allow_html=True)
+
+# ============================================================================
+# COST TRACKING HELPER
+# ============================================================================
+
+def add_cost_transaction(amount: float, description: str, operation_type: str):
+    """
+    Add a cost transaction to the session state with audit trail
+
+    Args:
+        amount: Cost amount in dollars
+        description: Description of the operation
+        operation_type: Type of operation (extraction, report, categorization, etc.)
+    """
+    from datetime import datetime
+
+    transaction = {
+        'amount': amount,
+        'description': description,
+        'type': operation_type,
+        'timestamp': datetime.now().isoformat()
+    }
+
+    st.session_state.cost_transactions.append(transaction)
 
 # ============================================================================
 # TABS
@@ -379,8 +466,13 @@ with tab1:
                 status_text.empty()
                 progress_bar.empty()
 
-                # Update session state
-                st.session_state.total_cost += total_cost
+                # Update session state with transactional tracking
+                if total_cost > 0:
+                    add_cost_transaction(
+                        amount=total_cost,
+                        description=f"Batch extraction: {len(uploaded_files)} bills",
+                        operation_type="extraction_batch"
+                    )
 
                 # Store aggregate data for Tab 2 and Report Generation
                 successful_results = [r for r in results if r['success']]
@@ -514,8 +606,13 @@ with tab1:
                 
                 # DISPLAY RESULTS
                 if result["success"]:
-                    # Store in session
-                    st.session_state.total_cost += result['combined_cost']
+                    # Store in session with transactional tracking
+                    if result['combined_cost'] > 0:
+                        add_cost_transaction(
+                            amount=result['combined_cost'],
+                            description=f"PDF extraction: {uploaded_file.name}",
+                            operation_type="extraction_single"
+                        )
                     st.session_state.kwh = result['extraction']['total_kwh']
                     st.session_state.last_extraction = result
                     st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
@@ -627,8 +724,13 @@ with tab1:
                     result = extract_and_calculate_emissions(bill_text=bill_text, region=region)
                     
                     if result["success"]:
-                        # Store in session
-                        st.session_state.total_cost += result['combined_cost']
+                        # Store in session with transactional tracking
+                        if result['combined_cost'] > 0:
+                            add_cost_transaction(
+                                amount=result['combined_cost'],
+                                description="Text extraction",
+                                operation_type="extraction_text"
+                            )
                         st.session_state.kwh = result['extraction']['total_kwh']
                         st.session_state.last_extraction = result
                         st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Text extraction')
@@ -718,7 +820,12 @@ with tab1:
                 report = generate_gri_report_section(emissions_for_report, scope="Scope 2")
 
                 if report['validation_passed']:
-                    st.session_state.total_cost += report['cost']
+                    # Add transaction and update state atomically
+                    add_cost_transaction(
+                        amount=report['cost'],
+                        description="GRI 305-2 report generation",
+                        operation_type="report_generation"
+                    )
                     st.session_state.last_report = report
                     st.session_state.generating_report = False
 
@@ -872,7 +979,12 @@ with tab3:
         if activity:
             with st.spinner("Categorizing..."):
                 result = categorize_to_scope(activity)
-                st.session_state.total_cost += result.get('categorization_cost', 0)
+                if result.get('categorization_cost', 0) > 0:
+                    add_cost_transaction(
+                        amount=result['categorization_cost'],
+                        description=f"Scope categorization: {activity[:50]}",
+                        operation_type="categorization"
+                    )
                 
                 scope_color = {
                     "Scope 1": "●",
@@ -907,8 +1019,12 @@ with tab4:
                 
                 rag = ESGStandardsRAG()
                 result = rag.query(question)
-                
-                st.session_state.total_cost += 0.02
+
+                add_cost_transaction(
+                    amount=0.02,
+                    description=f"ESG standards query: {question[:50]}",
+                    operation_type="rag_query"
+                )
                 
                 st.success("Answer from ESG Standards:")
                 st.markdown(result['answer'])
@@ -959,9 +1075,13 @@ Format as bullet points, each with recommendation, estimated savings, and implem
 
             from src.utils import call_claude_with_cost
             insights, cost = call_claude_with_cost(prompt)
-            
-            st.session_state.total_cost += cost['total_cost']
-        
+
+            add_cost_transaction(
+                amount=cost['total_cost'],
+                description="Operational insights generation",
+                operation_type="insights_generation"
+            )
+
         st.success("Analysis complete!")
         st.markdown(insights)
         st.caption(f"Analysis cost: ${cost['total_cost']:.4f}")

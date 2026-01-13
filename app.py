@@ -215,7 +215,7 @@ st.sidebar.markdown(f"""
         {transaction_count} transactions
     </div>
     <div style="color: #6ee7b7; font-size: 0.65rem; margin-top: 0.5rem; font-style: italic;">
-        💡 Updates after each operation
+        💡 Click "View Audit" to update costs if delayed
     </div>
 </div>
 

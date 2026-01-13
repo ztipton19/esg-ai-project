@@ -1,219 +1,192 @@
 # ESG Automation System
 
-**Automate ESG compliance reporting with AI - 3-tier extraction strategy for 94% cost savings**
+Automate ESG compliance reporting with AI-powered utility bill extraction and GRI-compliant report generation.
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io)
-[![Claude](https://img.shields.io/badge/Claude-000000?style=for-the-badge&logo=anthropic&logoColor=white)](https://www.anthropic.com)
+## Business Problem
 
-## 🌍 Overview
+Large enterprises manually process thousands of utility bills annually for ESG reporting, leading to:
+- High labor costs (hours per bill for manual data entry)
+- Human error and inconsistency
+- Slow reporting cycles (weeks to compile data)
+- Expensive AI-only solutions ($10-20 per 1,000 bills)
 
-An intelligent ESG (Environmental, Social, Governance) compliance system that extracts data from utility bills, calculates emissions, and generates GRI-compliant reports. Built with a production-grade 3-tier extraction strategy that saves 94% on costs compared to AI-only approaches.
+This system automates the entire workflow from bill upload to GRI-compliant PDF reports, reducing processing time from hours to seconds and costs by 95%.
+
+## Technical Approach
+
+**AI-Native Architecture:**
+- **Claude Sonnet 4** - Data extraction from complex PDFs, report generation, and quality validation
+- **Docling (IBM)** - Local document AI for text-based PDFs (primary extraction layer)
+- **Tesseract OCR** - Local OCR for scanned documents (fallback layer)
+- **Streamlit** - Production web interface
+- **ReportLab** - Professional PDF generation
+
+**AI Integration Points:**
+1. PDF data extraction (3-tier strategy with Claude as final fallback)
+2. GRI 305-2 compliance report generation
+3. Data validation and hallucination detection
+4. Scope categorization (1/2/3)
+5. ESG standards Q&A via RAG
+
+## Overview
+
+Features a production-grade 3-tier extraction strategy that processes 95% of bills locally at zero cost, falling back to Claude Vision API only for complex layouts.
 
 ### Key Features
 
-- **📄 3-Tier PDF Extraction** - Docling → Tesseract OCR → Claude Vision API
-- **⚡ Cost Optimization** - ~$0.50-1.00/month vs $10-20/month for 1,000 bills (95%+ savings)
-- **📊 Emissions Calculator** - EPA eGRID emission factors by region
-- **📋 GRI Report Generator** - Automated GRI 305-2 compliant reports
-- **🔍 Full Audit Trail** - Complete validation and verification
-- **💰 Real-time Cost Tracking** - Track API costs per session
+- **3-Tier PDF Extraction** - Docling → Tesseract OCR → Claude Vision API
+- **Cost Optimization** - 95% of bills processed locally (free), 5% via Claude API (~$0.50-1.00 per 1,000 bills)
+- **Emissions Calculator** - EPA eGRID emission factors by region
+- **GRI Report Generator** - Professional PDF reports with GRI 305-2 compliance
+- **Full Audit Trail** - Complete validation and verification
+- **Batch Processing** - Process multiple bills simultaneously
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Python 3.9+
 - Anthropic API key ([get one here](https://console.anthropic.com/))
-- Tesseract OCR (for local installations)
+- Tesseract OCR (auto-installed on Streamlit Cloud)
 
-### Installation
+### Local Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/esg-ai-project.git
-   cd esg-ai-project
-   ```
+```bash
+# Clone repository
+git clone https://github.com/yourusername/esg-ai-project.git
+cd esg-ai-project
 
-2. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Install dependencies
+pip install -r requirements.txt
 
-3. **Install Tesseract OCR** (for Tier 2 extraction)
+# Install Tesseract OCR
+# Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
+# Linux: sudo apt-get install tesseract-ocr poppler-utils
+# macOS: brew install tesseract poppler
 
-   **Windows:**
-   - Download installer from [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
-   - Install to default location: `C:\Program Files\Tesseract-OCR`
-   - Add to PATH or the app will auto-detect it
+# Configure API key
+cp .env.example .env
+# Edit .env and add your ANTHROPIC_API_KEY
 
-   **Linux/Mac:**
-   ```bash
-   # Ubuntu/Debian
-   sudo apt-get install tesseract-ocr poppler-utils
+# Run application
+streamlit run app.py
+```
 
-   # macOS
-   brew install tesseract poppler
-   ```
+### Streamlit Cloud Deployment
 
-4. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your ANTHROPIC_API_KEY
-   ```
+1. Push to GitHub
+2. Connect to [Streamlit Cloud](https://streamlit.io/cloud)
+3. Add `ANTHROPIC_API_KEY` to Secrets
+4. Deploy
 
-5. **Run the app**
-   ```bash
-   streamlit run app.py
-   ```
+The system automatically installs Tesseract via `packages.txt`.
 
-## 💡 How It Works
+## How It Works
 
 ### 3-Tier Extraction Strategy
 
-```
-┌─────────────────────────────────────────────┐
-│  TIER 1: Docling (Text-based PDFs)         │
-│  Cost: $0 (local) | Success: 85%           │
-│  ↓ If confidence < 70%                      │
-├─────────────────────────────────────────────┤
-│  TIER 2: Tesseract OCR (Scanned PDFs)      │
-│  Cost: $0 (local) | Success: 10%           │
-│  ↓ If confidence < 70%                      │
-├─────────────────────────────────────────────┤
-│  TIER 3: Claude Vision API (Complex)       │
-│  Cost: ~$0.01-0.02/bill | Success: 5%      │
-└─────────────────────────────────────────────┘
-```
+The system attempts extraction in order, using cheaper methods first:
 
-### Cost Comparison
+**Tier 1: Docling (Local)** - Processes text-based PDFs locally. Handles 85% of bills at zero cost.
 
-| Approach | Cost/1000 Bills | Annual Cost |
-|----------|----------------|-------------|
-| **3-Tier (Ours)** | ~$0.50-1.00/month | ~$6-12/year |
-| Claude-only | $10-20/month | $120-240/year |
-| **Savings** | **95%+** | **$114-228/year** |
+**Tier 2: Tesseract OCR (Local)** - Processes scanned/image PDFs locally. Handles 10% of bills at zero cost.
 
-## 📊 Usage
+**Tier 3: Claude Vision API (Cloud)** - Handles complex layouts when local methods fail. Processes 5% of bills at ~$0.01-0.02 per bill.
 
-### 1. Extract Utility Bill Data
+### Usage
 
-**Option A: Upload PDF**
-- Drag and drop a PDF utility bill
-- Select your region for emissions calculation
-- Click "Extract from PDF"
+**Extract Data**
+- Upload PDF utility bills (single or batch)
+- Or paste text directly
+- Select region for emissions calculation
+- System automatically selects optimal extraction method
 
-**Option B: Paste Text**
-- Copy text from a utility bill
-- Paste into the text area
-- Click "Extract & Calculate"
+**Calculate Emissions**
+- Automatic calculation using EPA eGRID 2023 factors
+- Regional emission factors (US Average, Arkansas, California, Texas, New York, Florida)
+- Complete audit trail with calculation methodology
 
-### 2. Calculate Emissions
+**Generate Reports**
+- Professional PDF reports with GRI 305-2 compliance
+- Includes calculation methodology, emission factors, and validation statements
+- Download as PDF or plain text
 
-Automatically calculates:
-- CO2 emissions (kg and metric tons)
-- Uses EPA eGRID emission factors by region
-- Provides complete audit trail
-
-### 3. Generate GRI Report
-
-Click "Generate GRI 305-2 Report" to create:
-- Professional compliance disclosure
-- Year-over-year comparisons
-- Calculation methodology
-- Data quality notes
-- Downloadable report file
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 esg-ai-project/
-├── app.py                      # Main Streamlit interface
+├── app.py                      # Streamlit interface
 ├── src/
 │   ├── extract.py              # 3-tier extraction engine
 │   ├── calculate.py            # Emissions calculations
 │   ├── reports.py              # GRI report generation
+│   ├── pdf_generator.py        # PDF formatting
 │   ├── validation.py           # Data validation
-│   ├── categorize.py           # Scope categorization
-│   ├── rag.py                  # ESG standards RAG
-│   └── utils.py                # Utilities & API calls
-├── data/
-│   └── test_bills/             # Sample bills
+│   └── utils.py                # API calls & utilities
 ├── requirements.txt            # Python dependencies
-├── packages.txt                # System dependencies
+├── packages.txt                # System dependencies (Tesseract)
 └── .streamlit/
-    └── config.toml             # Streamlit config
+    └── config.toml             # App configuration
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
-
-Create a `.env` file:
 
 ```env
 ANTHROPIC_API_KEY=your_api_key_here
 ```
 
-### Streamlit Secrets (for deployment)
+### Streamlit Secrets
 
-For Streamlit Cloud, add to secrets:
+For cloud deployment:
 
 ```toml
 ANTHROPIC_API_KEY = "your_api_key_here"
 ```
 
-## 📈 Features in Detail
+## Supported Features
 
-### Supported Utility Types
-- ✅ Electricity bills (kWh, MWh)
-- ✅ Text-based PDFs
-- ✅ Scanned/image PDFs
-- ✅ Auto-converts units
+**Utility Types**
+- Electricity bills (kWh, MWh with auto-conversion)
+- Text-based PDFs
+- Scanned/image PDFs
+- Meter reading calculations
 
-### Emission Factor Sources
-- EPA eGRID 2024
-- Regional factors for:
-  - US Average
-  - Arkansas
-  - California
-  - Texas
-  - New York
-  - Florida
+**Validation & Quality**
+- Pre-extraction data validation
+- Post-extraction accuracy verification
+- Hallucination detection
+- Completeness checks
+- Rate sanity checks ($0.01-$5.00/kWh)
 
-### Validation & Quality
-- ✅ Pre-call data validation
-- ✅ Post-call accuracy verification
-- ✅ Hallucination detection
-- ✅ Completeness checks
-- ✅ Rate sanity checks
+**Regions Supported**
+- US Average
+- Arkansas
+- California
+- Texas
+- New York
+- Florida
 
-## 🚢 Deployment
+## Performance Metrics
 
-### Streamlit Cloud
+- **Extraction Speed**: 2-3s (Docling), 3-5s (OCR), 2-4s (Claude)
+- **Accuracy**: 85-90% (Docling), 70-85% (OCR), 95%+ (Claude)
+- **Cost per Bill**: $0 (95% of bills), ~$0.01-0.02 (5% of bills)
 
-1. Push to GitHub
-2. Connect to [Streamlit Cloud](https://streamlit.io/cloud)
-3. Add `ANTHROPIC_API_KEY` to secrets
-4. Deploy!
-
-The `packages.txt` file ensures Tesseract is installed automatically.
-
-### Docker
+## Docker Deployment
 
 ```dockerfile
 FROM python:3.9-slim
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy app
 COPY . /app
 WORKDIR /app
 
@@ -222,31 +195,54 @@ EXPOSE 8501
 CMD ["streamlit", "run", "app.py"]
 ```
 
-## 📊 Performance
+## Contributing
 
-- **Extraction Speed**: 2-3s (Docling), 3-5s (OCR), 2-4s (Claude)
-- **Accuracy**: 85-90% (Docling), 70-85% (OCR), 95%+ (Claude)
-- **Cost per Complete Workflow**: ~$0.006-0.011 (extraction + report)
+Contributions welcome. Please submit a Pull Request.
 
-## 🤝 Contributing
-
-Contributions welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
+## License
 
 MIT License - See LICENSE file for details
 
-## 🙏 Acknowledgments
+## Future Development Opportunities
+
+If moving forward with this system for enterprise deployment, key enhancements would include:
+
+**Performance & Cost Optimization**
+- Anthropic prompt caching (90% cost reduction on repeated prompts)
+- Batch API requests for processing 100+ bills simultaneously
+- Async processing for sub-second response times
+
+**Enterprise Integration**
+- MCP servers for SharePoint/OneDrive auto-ingestion
+- SAP/ERP integration for bi-directional data sync
+- Multi-tenant architecture with role-based access control
+- Custom emission factor databases for specific regions/utilities
+
+**Extended Scope Coverage**
+- Scope 1 emissions (natural gas, fleet vehicles)
+- Scope 3 emissions (supply chain, business travel)
+- Water usage and waste tracking
+- Multi-standard reporting (GRI, SASB, TCFD, CDP)
+
+**Advanced Analytics**
+- Anomaly detection for unusual consumption patterns
+- Cost optimization recommendations via AI
+- Year-over-year trend analysis and forecasting
+- Facility benchmarking and peer comparisons
+
+**Compliance & Audit**
+- Blockchain-based immutable audit trails
+- Third-party auditor access portals
+- Automated regulatory filing (EPA, state agencies)
+- Multi-language report generation
+
+## Acknowledgments
 
 - [Docling](https://github.com/DS4SD/docling) - IBM's document AI
 - [Anthropic Claude](https://www.anthropic.com) - AI extraction & report generation
 - [EPA eGRID](https://www.epa.gov/egrid) - Emission factors
 - [GRI Standards](https://www.globalreporting.org/) - Reporting framework
 
-## 📞 Support
-
-For issues or questions, please open a GitHub issue.
-
 ---
 
-**Built with Docling + Claude API + Streamlit** | v1.0 - 3-Tier Extraction
+Built with Docling + Claude API + Streamlit | v1.0

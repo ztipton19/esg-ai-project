@@ -51,7 +51,7 @@ def check_password():
 
 if not check_password():
     st.stop()  # Don't run the rest of the app
-    
+
 # ============================================================================
 # DEMO DATA
 # ============================================================================
@@ -136,29 +136,7 @@ st.markdown("""
         border-radius: 0.5rem;
         font-weight: 500;
     }
-
-    /* Sidebar Button Styling - Fix inverted states */
-    [data-testid="stSidebar"] .stButton > button {
-        background-color: #334155 !important;
-        color: #94a3b8 !important;
-        border: 1px solid #475569 !important;
-        transition: all 0.2s ease !important;
-    }
-    [data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #475569 !important;
-        color: #e2e8f0 !important;
-        border-color: #64748b !important;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
-    }
-    [data-testid="stSidebar"] .stButton > button:active,
-    [data-testid="stSidebar"] .stButton > button:focus {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        border-color: #10b981 !important;
-        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3) !important;
-    }
-
+    
     /* Tab Styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2rem;
@@ -186,85 +164,14 @@ st.caption("Automated compliance reporting with intelligent 3-tier extraction")
 # ============================================================================
 
 st.sidebar.markdown("### Session Costs")
+if 'total_cost' not in st.session_state:
+    st.session_state.total_cost = 0.0
 
-# Initialize transactional state model
-if 'cost_transactions' not in st.session_state:
-    st.session_state.cost_transactions = []
+st.sidebar.metric("Total API Cost", f"${st.session_state.total_cost:.4f}")
 
-# Derive total cost from transactions (reactive state)
-total_api_cost = sum(t['amount'] for t in st.session_state.cost_transactions)
-transaction_count = len(st.session_state.cost_transactions)
-
-# Use transaction count as key to force re-render when it changes
-cost_display_key = f"cost_display_{transaction_count}"
-
-# Display with visual feedback animation
-st.sidebar.markdown(f"""
-<div key="{cost_display_key}" style="
-    padding: 1rem;
-    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
-    border-radius: 0.5rem;
-    border: 2px solid #10b981;
-    animation: costUpdate 0.5s ease-in-out;
-">
-    <div style="color: #6ee7b7; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em;">TOTAL API COST</div>
-    <div style="color: #ffffff; font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', monospace; margin-top: 0.25rem;">
-        ${total_api_cost:.4f}
-    </div>
-    <div style="color: #a7f3d0; font-size: 0.7rem; margin-top: 0.25rem;">
-        {transaction_count} transactions
-    </div>
-    <div style="color: #6ee7b7; font-size: 0.65rem; margin-top: 0.5rem; font-style: italic;">
-        💡 Click "View Audit" to update costs if delayed
-    </div>
-</div>
-
-<style>
-@keyframes costUpdate {{
-    0% {{ transform: scale(1); opacity: 0.8; }}
-    50% {{ transform: scale(1.05); box-shadow: 0 0 25px rgba(16, 185, 129, 0.6); opacity: 1; }}
-    100% {{ transform: scale(1); opacity: 1; }}
-}}
-</style>
-""", unsafe_allow_html=True)
-
-col_reset, col_view = st.sidebar.columns(2)
-with col_reset:
-    if st.button("Reset", use_container_width=True):
-        st.session_state.cost_transactions = []
-        st.rerun()
-
-with col_view:
-    if st.button("View Audit", use_container_width=True):
-        st.session_state.show_cost_audit = not st.session_state.get('show_cost_audit', False)
-
-# Show transaction audit trail
-if st.session_state.get('show_cost_audit', False) and st.session_state.cost_transactions:
-    st.sidebar.markdown("---")
-    st.sidebar.markdown('<h4 style="color: #e2e8f0;">Transaction Audit Trail</h4>', unsafe_allow_html=True)
-
-    with st.sidebar.expander("Recent Transactions", expanded=True):
-        # Show last 5 transactions
-        for transaction in reversed(st.session_state.cost_transactions[-5:]):
-            st.markdown(f"""
-            <div style="
-                background: #1e293b;
-                padding: 0.5rem;
-                border-radius: 0.375rem;
-                margin-bottom: 0.5rem;
-                border-left: 3px solid #10b981;
-            ">
-                <div style="color: #10b981; font-size: 0.9rem; font-weight: 600;">
-                    ${transaction['amount']:.4f}
-                </div>
-                <div style="color: #94a3b8; font-size: 0.75rem;">
-                    {transaction['description']}
-                </div>
-                <div style="color: #64748b; font-size: 0.65rem; margin-top: 0.25rem;">
-                    {transaction['type']} • {transaction['timestamp'].split('T')[1][:8]}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+if st.sidebar.button("Reset Costs"):
+    st.session_state.total_cost = 0.0
+    st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.markdown('<h3 style="color: #e2e8f0;">Project Metrics <span style="font-size:0.7em; color:#64748b;">(Example Data)</span></h3>', unsafe_allow_html=True)
@@ -313,30 +220,6 @@ st.sidebar.markdown("""
 
 st.sidebar.markdown("---")
 st.sidebar.markdown('<span style="color: #94a3b8;"><strong>Built with:</strong> Docling + OCR + Claude API</span>', unsafe_allow_html=True)
-
-# ============================================================================
-# COST TRACKING HELPER
-# ============================================================================
-
-def add_cost_transaction(amount: float, description: str, operation_type: str):
-    """
-    Add a cost transaction to the session state with audit trail
-
-    Args:
-        amount: Cost amount in dollars
-        description: Description of the operation
-        operation_type: Type of operation (extraction, report, categorization, etc.)
-    """
-    from datetime import datetime
-
-    transaction = {
-        'amount': amount,
-        'description': description,
-        'type': operation_type,
-        'timestamp': datetime.now().isoformat()
-    }
-
-    st.session_state.cost_transactions.append(transaction)
 
 # ============================================================================
 # TABS
@@ -448,61 +331,68 @@ with tab1:
                 total_cost = 0
                 
                 for idx, uploaded_file in enumerate(uploaded_files):
-                    status_text.text(f"Processing {idx + 1}/{len(uploaded_files)}: {uploaded_file.name}")
-                    
-                    # Extract from PDF
-                    extracted = extract_from_pdf_hybrid(uploaded_file, confidence_threshold=0.70)
-                    
-                    if extracted:
-                        # Calculate emissions
-                        start = extracted.get("service_start_date", "Unknown")
-                        end = extracted.get("service_end_date", "Unknown")
-                        reporting_period = f"{start} to {end}"
+                    with st.spinner(f"Processing {idx + 1}/{len(uploaded_files)}: {uploaded_file.name}"):
+                        # Extract from PDF
+                        extracted = extract_from_pdf_hybrid(uploaded_file, confidence_threshold=0.70)
                         
-                        emissions_result = calculate_electricity_emissions(
-                            kwh=extracted.get("total_kwh", 0),
-                            region=region,
-                            reporting_period=reporting_period
-                        )
+                        if extracted:
+                            # Determine which tier was used
+                            method = extracted.get("extraction_method", "")
+                            if "Docling" in method:
+                                tier_name = "Docling"
+                                tier_counts["Tier 1 (Docling)"] += 1
+                            elif "OCR" in method:
+                                tier_name = "Tesseract OCR"
+                                tier_counts["Tier 2 (OCR)"] += 1
+                            elif "Claude" in method or "Vision" in method:
+                                tier_name = "Claude Vision"
+                                tier_counts["Tier 3 (Claude Vision)"] += 1
+                            else:
+                                tier_name = "Unknown"
+                            
+                            # Update status with tier info
+                            status_text.success(f"✅ {idx + 1}/{len(uploaded_files)}: {uploaded_file.name} - Extracted using {tier_name}")
+                            
+                            # Calculate emissions
+                            start = extracted.get("service_start_date", "Unknown")
+                            end = extracted.get("service_end_date", "Unknown")
+                            reporting_period = f"{start} to {end}"
+                            
+                            emissions_result = calculate_electricity_emissions(
+                                kwh=extracted.get("total_kwh", 0),
+                                region=region,
+                                reporting_period=reporting_period
+                            )
+                            
+                            result = {
+                                "success": True,
+                                "filename": uploaded_file.name,
+                                "extraction": extracted,
+                                "emissions": emissions_result,
+                                "cost": extracted.get("extraction_cost", 0)
+                            }
+                            
+                            total_cost += result['cost']
+                            results.append(result)
+                        else:
+                            status_text.error(f"❌ {idx + 1}/{len(uploaded_files)}: {uploaded_file.name} - Extraction failed")
+                            results.append({
+                                "success": False,
+                                "filename": uploaded_file.name,
+                                "error": "Extraction failed"
+                            })
                         
-                        result = {
-                            "success": True,
-                            "filename": uploaded_file.name,
-                            "extraction": extracted,
-                            "emissions": emissions_result,
-                            "cost": extracted.get("extraction_cost", 0)
-                        }
-                        
-                        # Track tier usage
-                        method = extracted.get("extraction_method", "")
-                        if "Docling" in method:
-                            tier_counts["Tier 1 (Docling)"] += 1
-                        elif "OCR" in method:
-                            tier_counts["Tier 2 (OCR)"] += 1
-                        elif "Claude" in method or "Vision" in method:
-                            tier_counts["Tier 3 (Claude Vision)"] += 1
-                        
-                        total_cost += result['cost']
-                        results.append(result)
-                    else:
-                        results.append({
-                            "success": False,
-                            "filename": uploaded_file.name,
-                            "error": "Extraction failed"
-                        })
-                    
-                    progress_bar.progress((idx + 1) / len(uploaded_files))
+                        progress_bar.progress((idx + 1) / len(uploaded_files))
                 
                 status_text.empty()
                 progress_bar.empty()
 
-                # Update session state with transactional tracking
-                if total_cost > 0:
-                    add_cost_transaction(
-                        amount=total_cost,
-                        description=f"Batch extraction: {len(uploaded_files)} bills",
-                        operation_type="extraction_batch"
-                    )
+                # Update session state
+                st.session_state.total_cost += total_cost
+
+                # Store batch results for persistent display (CRITICAL - before rerun)
+                st.session_state.batch_results = results
+                st.session_state.batch_tier_counts = tier_counts
 
                 # Store aggregate data for Tab 2 and Report Generation
                 successful_results = [r for r in results if r['success']]
@@ -534,74 +424,12 @@ with tab1:
                     st.session_state.extraction_method = "Batch Processing"
                     st.session_state.extraction_region = region
 
-                # ===== DISPLAY BATCH RESULTS =====
-                st.success(f"Processed {len([r for r in results if r['success']])} of {len(uploaded_files)} bills")
-                
-                # Tier breakdown
-                st.markdown("### 3-Tier Cost Optimization")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Tier 1 (Docling)", f"{tier_counts['Tier 1 (Docling)']} bills", "$0 (local)")
-                with col2:
-                    st.metric("Tier 2 (OCR)", f"{tier_counts['Tier 2 (OCR)']} bills", "$0 (local)")
-                with col3:
-                    st.metric("Tier 3 (Claude)", f"{tier_counts['Tier 3 (Claude Vision)']} bills", "~$0.01-0.02 each")
-                
-                # Cost comparison
-                claude_only_cost = len(uploaded_files) * 0.02
-                savings = claude_only_cost - total_cost
-                savings_pct = (savings / claude_only_cost * 100) if claude_only_cost > 0 else 0
-                
-                st.markdown("### Cost Analysis")
-                col4, col5, col6 = st.columns(3)
-                with col4:
-                    st.metric("Actual Cost", f"${total_cost:.4f}")
-                with col5:
-                    st.metric("Claude-Only Cost", f"${claude_only_cost:.4f}")
-                with col6:
-                    st.metric("Savings", f"${savings:.4f}", f"{savings_pct:.1f}%")
-                
-                # Aggregate emissions
-                successful_results = [r for r in results if r['success']]
+                # Force rerun to show report button immediately
                 if successful_results:
-                    st.markdown("### Aggregate Emissions")
-                    
-                    total_kwh = sum(r['extraction']['total_kwh'] for r in successful_results)
-                    total_emissions = sum(r['emissions']['data']['emissions_mtco2e'] for r in successful_results)
-                    total_bill_cost = sum(r['extraction'].get('total_cost', 0) for r in successful_results if r['extraction'].get('total_cost'))
-                    
-                    col7, col8, col9 = st.columns(3)
-                    with col7:
-                        st.metric("Total Usage", f"{total_kwh:,.0f} kWh")
-                    with col8:
-                        st.metric("Total Emissions", f"{total_emissions:.4f} MT CO2e")
-                    with col9:
-                        st.metric("Total Cost", f"${total_bill_cost:,.2f}")
-                
-                # Individual results table
-                with st.expander("Individual Bill Results", expanded=False):
-                    for result in results:
-                        if result['success']:
-                            st.markdown(f"**{result['filename']}**")
-                            col_a, col_b, col_c, col_d = st.columns(4)
-                            with col_a:
-                                st.caption(f"Usage: {result['extraction']['total_kwh']:.0f} kWh")
-                            with col_b:
-                                st.caption(f"Emissions: {result['emissions']['data']['emissions_mtco2e']} MT")
-                            with col_c:
-                                st.caption(f"Method: {result['extraction'].get('extraction_method', 'N/A')}")
-                            with col_d:
-                                st.caption(f"Cost: ${result['cost']:.4f}")
-                            st.markdown("---")
-                        else:
-                            st.error(f" {result['filename']}: {result.get('error', 'Unknown error')}")
-
-                # Force rerun to show the report button immediately
-                if successful_results and 'last_extraction' in st.session_state:
                     st.rerun()
 
             else:
+                # ===== SINGLE FILE MODE =====
                 # ===== SINGLE FILE MODE (original code) =====
                 uploaded_file = uploaded_files[0]
                 
@@ -636,23 +464,14 @@ with tab1:
                 
                 # DISPLAY RESULTS
                 if result["success"]:
-                    # Store in session with transactional tracking
-                    if result['combined_cost'] > 0:
-                        add_cost_transaction(
-                            amount=result['combined_cost'],
-                            description=f"PDF extraction: {uploaded_file.name}",
-                            operation_type="extraction_single"
-                        )
-                        # Show immediate cost feedback
-                        current_total = sum(t['amount'] for t in st.session_state.cost_transactions)
-                        st.success(f"✅ Extraction successful! | Cost: ${result['combined_cost']:.4f} | Session Total: ${current_total:.4f}")
-                    else:
-                        st.success("✅ Extraction successful! (Free - processed locally)")
-
+                    # Store in session
+                    st.session_state.total_cost += result['combined_cost']
                     st.session_state.kwh = result['extraction']['total_kwh']
                     st.session_state.last_extraction = result
                     st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Unknown')
                     st.session_state.extraction_region = region
+
+                    st.success("Extraction successful!")
 
                     # Show method with cost
                     method = result['extraction'].get('extraction_method', 'Unknown')
@@ -717,6 +536,142 @@ with tab1:
                         st.json(result)
                 else:
                     st.error(f" {result['error']}")
+        
+        # ===== DISPLAY BATCH RESULTS (persists after rerun) =====
+        if 'batch_results' in st.session_state and st.session_state.batch_results:
+            results = st.session_state.batch_results
+            tier_counts = st.session_state.batch_tier_counts
+            
+            st.markdown("---")
+            st.success(f"Batch Results: {len([r for r in results if r['success']])} of {len(results)} bills processed")
+            
+            # Tier breakdown
+            st.markdown("### 3-Tier Cost Optimization")
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Tier 1 (Docling)", f"{tier_counts['Tier 1 (Docling)']} bills", "$0 (local)")
+            with col2:
+                st.metric("Tier 2 (OCR)", f"{tier_counts['Tier 2 (OCR)']} bills", "$0 (local)")
+            with col3:
+                st.metric("Tier 3 (Claude)", f"{tier_counts['Tier 3 (Claude Vision)']} bills", "~$0.01-0.02 each")
+            
+            # Cost comparison
+            total_cost = sum(r.get('cost', 0) for r in results if r['success'])
+            claude_only_cost = len(results) * 0.02
+            savings = claude_only_cost - total_cost
+            savings_pct = (savings / claude_only_cost * 100) if claude_only_cost > 0 else 0
+            
+            st.markdown("### Cost Analysis")
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                st.metric("Actual Cost", f"${total_cost:.4f}")
+            with col5:
+                st.metric("Claude-Only Cost", f"${claude_only_cost:.4f}")
+            with col6:
+                st.metric("Savings", f"${savings:.4f}", f"{savings_pct:.1f}%")
+            
+            # Aggregate emissions
+            successful_results = [r for r in results if r['success']]
+            if successful_results:
+                st.markdown("### Aggregate Emissions")
+                
+                total_kwh = sum(r['extraction']['total_kwh'] for r in successful_results)
+                total_emissions = sum(r['emissions']['data']['emissions_mtco2e'] for r in successful_results)
+                total_bill_cost = sum(r['extraction'].get('total_cost', 0) for r in successful_results if r['extraction'].get('total_cost'))
+                
+                col7, col8, col9 = st.columns(3)
+                with col7:
+                    st.metric("Total Usage", f"{total_kwh:,.0f} kWh")
+                with col8:
+                    st.metric("Total Emissions", f"{total_emissions:.4f} MT CO2e")
+                with col9:
+                    st.metric("Total Cost", f"${total_bill_cost:,.2f}")
+            
+            # Individual results + Detailed Audit Trail
+            with st.expander("Individual Bill Results", expanded=False):
+                for result in results:
+                    if result['success']:
+                        st.markdown(f"**{result['filename']}**")
+                        col_a, col_b, col_c, col_d = st.columns(4)
+                        with col_a:
+                            st.caption(f"Usage: {result['extraction']['total_kwh']:.0f} kWh")
+                        with col_b:
+                            st.caption(f"Emissions: {result['emissions']['data']['emissions_mtco2e']} MT")
+                        with col_c:
+                            st.caption(f"Method: {result['extraction'].get('extraction_method', 'N/A')}")
+                        with col_d:
+                            st.caption(f"Cost: ${result['cost']:.4f}")
+                        st.markdown("---")
+                    else:
+                        st.error(f"{result['filename']}: {result.get('error', 'Unknown error')}")
+            
+            # Detailed audit trail
+            st.markdown("---")
+            st.subheader("Detailed Extraction Audit Trail")
+            st.caption("View exactly what was extracted from each bill and how")
+            
+            for idx, result in enumerate([r for r in results if r['success']]):
+                with st.expander(f"📋 {result['filename']} - Detailed Audit", expanded=False):
+                    method = result['extraction'].get('extraction_method', 'Unknown')
+                    st.markdown(f"**Extraction Method:** {method}")
+                    
+                    if "Docling" in method:
+                        st.success("✅ Tier 1 (Docling) - Text-based PDF, $0 cost")
+                    elif "OCR" in method:
+                        st.info("📸 Tier 2 (OCR) - Scanned/Image PDF, $0 cost")
+                    elif "Claude" in method or "Vision" in method:
+                        st.warning(f"🤖 Tier 3 (Claude Vision) - Complex layout, ~${result['cost']:.4f}")
+                    
+                    st.markdown("#### 🔍 Extracted Data Points")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Usage:**")
+                        kwh = result['extraction'].get('total_kwh', 0)
+                        st.code(f"{kwh:.2f} kWh")
+                        
+                        if result['extraction'].get('unit_conversion_applied'):
+                            st.caption(f"📊 {result['extraction']['unit_conversion_applied']}")
+                        
+                        if result['extraction'].get('current_meter_reading'):
+                            st.caption(f"Current reading: {result['extraction']['current_meter_reading']}")
+                            st.caption(f"Previous reading: {result['extraction'].get('previous_meter_reading', 'N/A')}")
+                    
+                    with col2:
+                        st.markdown("**Cost:**")
+                        bill_cost = result['extraction'].get('total_cost', 0)
+                        if bill_cost:
+                            st.code(f"${bill_cost:.2f}")
+                            rate = result['extraction'].get('calculated_rate_per_kwh', 0)
+                            if rate:
+                                st.caption(f"Rate: ${rate:.3f}/kWh")
+                        else:
+                            st.code("Not found in bill")
+                    
+                    st.markdown("**Service Period:**")
+                    start = result['extraction'].get('service_start_date', 'N/A')
+                    end = result['extraction'].get('service_end_date', 'N/A')
+                    st.caption(f"{start} to {end}")
+                    
+                    if result['extraction'].get('confidence_score'):
+                        st.markdown(f"**Confidence Score:** {result['extraction']['confidence_score']:.0%}")
+                    
+                    st.markdown("#### 🔧 Technical Details")
+                    with st.expander("View Raw Extraction Data"):
+                        st.json({
+                            "extraction_timestamp": result['extraction'].get('extraction_timestamp'),
+                            "validation_passed": result['extraction'].get('validation_passed'),
+                            "all_extracted_fields": {k: v for k, v in result['extraction'].items() 
+                                                    if k not in ['extraction_timestamp', 'extraction_method']}
+                        })
+                    
+                    st.markdown("#### 🌍 Emissions Calculation")
+                    st.code(result['emissions']['audit']['calculation_formula'])
+                    st.caption(f"Factor: {result['emissions']['audit']['emission_factor']} {result['emissions']['audit']['emission_factor_unit']}")
+                    st.caption(f"Source: {result['emissions']['audit']['emission_factor_source']}")
+                    
+                    st.markdown("---")
     
     # ===== TEXT PASTE MODE =====
     else:
@@ -758,13 +713,8 @@ with tab1:
                     result = extract_and_calculate_emissions(bill_text=bill_text, region=region)
                     
                     if result["success"]:
-                        # Store in session with transactional tracking
-                        if result['combined_cost'] > 0:
-                            add_cost_transaction(
-                                amount=result['combined_cost'],
-                                description="Text extraction",
-                                operation_type="extraction_text"
-                            )
+                        # Store in session
+                        st.session_state.total_cost += result['combined_cost']
                         st.session_state.kwh = result['extraction']['total_kwh']
                         st.session_state.last_extraction = result
                         st.session_state.extraction_method = result['extraction'].get('extraction_method', 'Text extraction')
@@ -854,18 +804,11 @@ with tab1:
                 report = generate_gri_report_section(emissions_for_report, scope="Scope 2")
 
                 if report['validation_passed']:
-                    # Add transaction and update state atomically
-                    add_cost_transaction(
-                        amount=report['cost'],
-                        description="GRI 305-2 report generation",
-                        operation_type="report_generation"
-                    )
+                    st.session_state.total_cost += report['cost']
                     st.session_state.last_report = report
                     st.session_state.generating_report = False
 
-                    # Show immediate cost feedback
-                    current_total = sum(t['amount'] for t in st.session_state.cost_transactions)
-                    st.success(f"✅ Report generated and validated! | Cost: ${report['cost']:.4f} | Session Total: ${current_total:.4f}")
+                    st.success("✅ Report generated and validated!")
 
                     with st.expander("📄 GRI 305-2 Compliance Report", expanded=True):
                         st.markdown(report['report_text'])
@@ -1015,12 +958,7 @@ with tab3:
         if activity:
             with st.spinner("Categorizing..."):
                 result = categorize_to_scope(activity)
-                if result.get('categorization_cost', 0) > 0:
-                    add_cost_transaction(
-                        amount=result['categorization_cost'],
-                        description=f"Scope categorization: {activity[:50]}",
-                        operation_type="categorization"
-                    )
+                st.session_state.total_cost += result.get('categorization_cost', 0)
                 
                 scope_color = {
                     "Scope 1": "●",
@@ -1055,12 +993,8 @@ with tab4:
                 
                 rag = ESGStandardsRAG()
                 result = rag.query(question)
-
-                add_cost_transaction(
-                    amount=0.02,
-                    description=f"ESG standards query: {question[:50]}",
-                    operation_type="rag_query"
-                )
+                
+                st.session_state.total_cost += 0.02
                 
                 st.success("Answer from ESG Standards:")
                 st.markdown(result['answer'])
@@ -1111,13 +1045,9 @@ Format as bullet points, each with recommendation, estimated savings, and implem
 
             from src.utils import call_claude_with_cost
             insights, cost = call_claude_with_cost(prompt)
-
-            add_cost_transaction(
-                amount=cost['total_cost'],
-                description="Operational insights generation",
-                operation_type="insights_generation"
-            )
-
+            
+            st.session_state.total_cost += cost['total_cost']
+        
         st.success("Analysis complete!")
         st.markdown(insights)
         st.caption(f"Analysis cost: ${cost['total_cost']:.4f}")
